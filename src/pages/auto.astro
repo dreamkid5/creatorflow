@@ -1,0 +1,708 @@
+---
+import Layout from "../layouts/Layout.astro";
+import Icon from "../components/Icon.astro";
+
+// Which premium voice provider is active, chosen by whichever key is set.
+const premiumProvider = process.env.CF_TTS_PROVIDER || (process.env.LOCAL_TTS_URL ? "local" : process.env.AZURE_SPEECH_KEY ? "azure" : process.env.GOOGLE_TTS_KEY ? "google" : process.env.ELEVENLABS_API_KEY ? "elevenlabs" : "");
+const premiumVoices = {
+  local: [ { v: "local", l: "Local voice, on your Mac" } ],
+  elevenlabs: [
+    { v: "VR6AewLTigWG4xSOukaG", l: "Arnold, documentary US male" },
+    { v: "pNInz6obpgDQGcFmaJgB", l: "Adam, deep US male" },
+    { v: "ErXwobaYiN019PkySvjV", l: "Antoni, warm US male" },
+    { v: "21m00Tcm4TlvDq8ikWAM", l: "Rachel, US female" },
+    { v: "EXAVITQu4vr4xnSDxMaL", l: "Bella, US female" },
+    { v: "TxGEqnHWrfWFTfGW9XjX", l: "Josh, US male" }
+  ],
+  google: [
+    { v: "en-US-Neural2-J", l: "US male, documentary" },
+    { v: "en-GB-Neural2-B", l: "UK male" },
+    { v: "en-US-Studio-O", l: "US female, studio" },
+    { v: "en-US-Neural2-D", l: "US male, deep" },
+    { v: "en-GB-Neural2-A", l: "UK female" },
+    { v: "en-US-Neural2-F", l: "US female" }
+  ],
+  azure: [
+    { v: "en-US-GuyNeural", l: "Guy, US male" },
+    { v: "en-GB-RyanNeural", l: "Ryan, UK male documentary" },
+    { v: "en-US-JennyNeural", l: "Jenny, US female" },
+    { v: "en-GB-SoniaNeural", l: "Sonia, UK female" },
+    { v: "en-US-DavisNeural", l: "Davis, US male" },
+    { v: "en-US-AriaNeural", l: "Aria, US female" }
+  ]
+};
+const activeVoices = premiumVoices[premiumProvider] || premiumVoices.elevenlabs;
+const premiumLabel = premiumProvider === "local" ? "Narrator, free local voice" : premiumProvider ? ("Premium narrator, " + premiumProvider) : "Premium narrator, your free key";
+---
+<Layout title="Auto Video" subtitle="Write prompts, generate images, narrate, and render a whole video" active="auto" page="Auto Video">
+
+  <section class="grid vstudio-cols" style="grid-template-columns: minmax(0,1fr) 320px; gap:18px; align-items:start;">
+
+    <!-- Preview -->
+    <div class="studio-left" style="display:flex; flex-direction:column; gap:16px; min-width:0;">
+      <div class="card pad">
+        <div class="studio-stage"><canvas id="autoStage" width="1280" height="720"></canvas></div>
+        <div class="transport">
+          <button class="play-btn" id="autoPlay" aria-label="Play"><Icon name="play" size={20} /></button>
+          <span class="time" id="autoCur">0:00</span>
+          <div class="scrub" id="autoScrub"><div class="fill" id="autoFill"></div></div>
+          <span class="time" id="autoTot">0:00</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- Controls -->
+    <div style="display:flex; flex-direction:column; gap:16px; min-width:0;">
+      <div class="card">
+        <div class="card-head"><div><h3>Settings</h3><p>Style, motion, and voice</p></div></div>
+        <div class="card-body">
+          <div class="field" style="margin-bottom:12px;">
+            <label>Art style</label>
+            <select class="select" id="styleSel">
+              <option value="watercolor">Watercolor illustration</option>
+              <option value="cinematic">Cinematic photo</option>
+              <option value="storybook">Storybook painting</option>
+              <option value="anime">Anime</option>
+              <option value="3d">3D render</option>
+              <option value="flat">Flat vector</option>
+              <option value="oil">Oil painting</option>
+              <option value="pencil">Pencil sketch</option>
+              <option value="comic">Comic book</option>
+              <option value="papercut">Paper cut</option>
+              <option value="fantasy">Fantasy art</option>
+              <option value="vintage">Vintage photo</option>
+              <option value="pixel">Pixel art</option>
+              <option value="claymation">Claymation</option>
+              <option value="lineart">Line art</option>
+              <option value="synthwave">Synthwave neon</option>
+              <option value="folktale">African folktale</option>
+            </select>
+          </div>
+          <div class="field" style="margin-bottom:12px;">
+            <label>Transition</label>
+            <select class="select" id="transSel">
+              <option value="crossfade">Crossfade</option>
+              <option value="fade">Fade through black</option>
+              <option value="slide">Slide</option>
+              <option value="zoom">Zoom only</option>
+            </select>
+          </div>
+          <div class="field" style="margin-bottom:12px;">
+            <label>Narration</label>
+            <div class="seg" id="narrModeSeg">
+              <button data-mode="generate" class="on">Free</button>
+              <button data-mode="premium">Premium</button>
+              <button data-mode="upload">Upload</button>
+              <button data-mode="none">None</button>
+            </div>
+          </div>
+          <div class="field" id="voicePanel" style="margin-bottom:0;">
+            <label>Free voice, runs on your device</label>
+            <select class="select" id="voiceSel">
+              <option value="bm_george">George, UK documentary</option>
+              <option value="af_heart">Aria, warm US female</option>
+              <option value="am_michael">Michael, calm US male</option>
+              <option value="bf_emma">Emma, UK female</option>
+              <option value="af_bella">Bella, US female</option>
+              <option value="am_adam">Adam, US male</option>
+            </select>
+          </div>
+          <div class="field" id="premiumPanel" style="display:none;margin-bottom:0;">
+            <label>{premiumLabel}</label>
+            <select class="select" id="premiumVoiceSel" data-provider={premiumProvider}>
+              {activeVoices.map((o) => <option value={o.v}>{o.l}</option>)}
+            </select>
+            <p class="hint" style="margin-top:8px;">
+              {premiumProvider === "local"
+                ? "Free voice on your Mac, no key and no card. Keep the voice server running."
+                : premiumProvider
+                ? "Studio quality voice using your " + premiumProvider + " key, kept server side."
+                : "No premium voice set. Add a key or run the local voice server, then restart. See the guide."}
+            </p>
+          </div>
+          <div id="uploadPanel" style="display:none;">
+            <button class="btn" id="uploadAudioBtn" style="width:100%;justify-content:center;"><Icon name="upload" size={15} />Upload your voiceover</button>
+            <div id="audioRow" style="display:none;align-items:center;gap:10px;margin-top:10px;">
+              <span class="status-dot ok"></span>
+              <span id="audioInfo" style="font-size:12.5px;font-weight:600;flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">audio</span>
+              <button class="btn sm ghost" id="audioRemove" style="color:var(--rose);">Remove</button>
+            </div>
+            <p class="hint" style="margin-top:8px;">Your audio becomes the narration. Scenes are spread evenly across it.</p>
+          </div>
+          <p class="hint" id="nonePanel" style="display:none;margin:2px 0 0;">No narration. Scenes play with motion only.</p>
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="card-head"><div><h3>Polish</h3><p>Title card and music</p></div></div>
+        <div class="card-body">
+          <div class="field" style="margin-bottom:14px;">
+            <label>Title card, optional</label>
+            <input class="input" id="titleText" placeholder="For example, The History of Valerian" />
+          </div>
+          <label style="display:block;font-size:12.5px;font-weight:700;color:var(--muted);margin-bottom:8px;">Background music</label>
+          <button class="btn" id="musicBtn" style="width:100%;justify-content:center;"><Icon name="music" size={15} />Add music</button>
+          <div id="musicRow" style="display:none;align-items:center;gap:10px;margin-top:10px;">
+            <span class="status-dot ok"></span>
+            <span id="musicName" style="font-size:12.5px;font-weight:600;flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">music</span>
+            <button class="btn sm ghost" id="musicRemove" style="color:var(--rose);">Remove</button>
+          </div>
+          <div id="musicVolWrap" style="display:none;margin-top:12px;">
+            <label style="font-size:12.5px;font-weight:700;color:var(--muted);">Music volume <span class="faint" id="musicVolVal">35%</span></label>
+            <input class="range" id="musicVol" type="range" min="0" max="100" value="35" style="margin-top:6px;" />
+          </div>
+          <label style="display:flex;align-items:center;gap:10px;margin-top:16px;cursor:pointer;font-size:12.5px;font-weight:600;color:var(--text);">
+            <input type="checkbox" id="capToggle" style="width:16px;height:16px;accent-color:var(--violet);" />
+            Show captions on screen
+          </label>
+          <p class="hint" style="margin:6px 0 0;">Off by default, so your video stays clean with no words on it.</p>
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="card-head"><div><h3>Make the video</h3></div></div>
+        <div class="card-body">
+          <button class="btn primary" id="makeAll" style="width:100%;justify-content:center;margin-bottom:12px;background:linear-gradient(135deg,var(--violet),var(--cyan));"><Icon name="wand" size={16} />Make the whole video</button>
+          <div style="border-top:1px solid var(--border);margin:0 0 12px;"></div>
+          <label style="display:block;font-size:11px;font-weight:700;color:var(--faint);text-transform:uppercase;letter-spacing:.6px;margin-bottom:8px;">Or run it step by step</label>
+          <button class="btn" id="genAll" style="width:100%;justify-content:center;margin-bottom:10px;"><Icon name="robot" size={16} />1. Generate images and voice</button>
+          <button class="btn" id="buildBtn" style="width:100%;justify-content:center;margin-bottom:10px;" disabled><Icon name="film" size={16} />2. Build the video</button>
+          <button class="btn" id="exportBtn" style="width:100%;justify-content:center;" disabled><Icon name="download" size={16} />3. Export MP4</button>
+          <div id="exportProg" style="display:none;margin-top:12px;">
+            <div class="bar"><span id="exportFill" style="width:0%"></span></div>
+          </div>
+          <p class="hint" id="autoStatus" style="margin-top:10px;text-align:center;">Write your scenes below, then press Generate.</p>
+          <div id="renderHistory" style="margin-top:10px;"></div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- Scenes -->
+  <section class="mt-18">
+    <div class="card">
+      <div class="card-head">
+        <div><h3>Scenes</h3><p>One image prompt and one narration line per scene</p></div>
+        <div class="actions"><button class="btn sm" id="addScene"><Icon name="plus" size={14} />Add scene</button></div>
+      </div>
+      <div class="card-body">
+        <div class="field" style="margin-bottom:16px;">
+          <label>Paste a full script to fill the scenes automatically</label>
+          <textarea class="textarea" id="scriptPaste" style="min-height:84px;" placeholder="Paste your whole narration script. Every sentence or paragraph becomes its own scene, with no limit."></textarea>
+          <div class="flex gap-10" style="margin-top:8px; align-items:center; flex-wrap:wrap;">
+            <button class="btn sm primary" id="fillScenes"><Icon name="sparkles" size={14} />Fill scenes from script</button>
+            <span class="hint">This replaces the scenes below with one per sentence or paragraph.</span>
+          </div>
+        </div>
+        <div id="sceneList"></div>
+      </div>
+    </div>
+  </section>
+
+  <canvas id="autoOff" width="1280" height="720" style="display:none;"></canvas>
+  <audio id="narrationEl" style="display:none;"></audio>
+  <audio id="musicEl" loop style="display:none;"></audio>
+  <input type="file" id="audioInput" accept="audio/*" style="display:none;" />
+  <input type="file" id="musicInput" accept="audio/*" style="display:none;" />
+
+  <script is:inline>
+  (function () {
+    const canvas = document.getElementById("autoStage");
+    const ctx = canvas.getContext("2d");
+    const W = canvas.width, H = canvas.height;
+    const DEF = 3.2; // seconds for a scene with no narration
+
+    const styleKW = {
+      watercolor: "storybook illustration, clean bold ink outlines, flat soft watercolor fills, warm vivid palette, gentle cel shading, cream paper background with loose watercolor edges, editorial childrens book art, crisp and detailed, not photorealistic",
+      cinematic: "cinematic photograph, dramatic lighting, film still, highly detailed, 35mm",
+      storybook: "storybook painting, warm, painterly, whimsical",
+      anime: "anime style, cel shaded, vibrant, detailed background",
+      "3d": "3d render, soft studio lighting, subsurface scattering, pixar style",
+      flat: "flat vector illustration, minimal, bold shapes, clean",
+      oil: "oil painting, rich impasto brushstrokes, classical, textured canvas, warm light",
+      pencil: "detailed pencil sketch, graphite shading, cross hatching, monochrome, hand drawn",
+      comic: "comic book illustration, bold ink outlines, halftone dots, dynamic, vibrant colors",
+      papercut: "layered paper cut art, soft drop shadows, tactile, handcrafted, clean edges",
+      fantasy: "epic fantasy concept art, luminous atmosphere, highly detailed digital painting",
+      vintage: "vintage photograph, faded film grain, nostalgic, sepia and muted tones",
+      pixel: "pixel art, 16 bit retro game style, crisp pixels, limited palette",
+      claymation: "claymation, plasticine clay model, stop motion, soft studio light",
+      lineart: "elegant line art, minimal single weight lines, clean white background",
+      synthwave: "synthwave retro futuristic, neon glow, purple and cyan, 1980s aesthetic",
+      folktale: "African folktale illustration, rich earth tones, bold tribal patterns, Ndebele and Kente inspired motifs, warm ochre and indigo palette, textured, storytelling art"
+    };
+
+    let scenes = [
+      { prompt: "A weary Roman man in a toga at a candlelit desk with a scroll at night", narration: "In ancient Rome, a weary man sat by candlelight, unable to quiet his restless mind.", img: null, thumbUrl: null, audioBlob: null, status: "" },
+      { prompt: "A Roman physician holding dried valerian roots in a stone room, herbs hanging, candlelight", narration: "For his sleeplessness, physicians reached for a humble root known as valerian, prized since the days of Galen.", img: null, thumbUrl: null, audioBlob: null, status: "" },
+      { prompt: "A medieval monk tending valerian plants in a walled monastery garden at golden hour", narration: "Through medieval monasteries, monks tended the plant in walled gardens and brewed it into calming evening tisanes.", img: null, thumbUrl: null, audioBlob: null, status: "" },
+      { prompt: "A person sleeping peacefully in bed at dawn, soft light through a window", narration: "By dawn, the gentle herb had done its quiet work, and the restless sleeper found peace at last.", img: null, thumbUrl: null, audioBlob: null, status: "" }
+    ];
+    let sceneDurations = [], total = 0, built = false;
+    let narrationBlob = null;
+    const narrationEl = document.getElementById("narrationEl");
+    let audioCtx = null, voiceSrc = null, streamDest = null;
+    let narrationMode = "generate", uploadedAudioBlob = null, uploadedAudioUrl = null, uploadedAudioDur = 0, hasAudio = false;
+    const TITLE_DUR = 3.5;
+    let titleDur = 0, narrStarted = false;
+    const musicEl = document.getElementById("musicEl");
+    let musicUrl = null, hasMusic = false, musicVol = 0.35, musicSrc = null, musicGain = null;
+
+    const fmt = (s) => { s = Math.max(0, s); const m = Math.floor(s / 60), ss = Math.floor(s % 60); return m + ":" + (ss < 10 ? "0" : "") + ss; };
+    const setStatus = (m) => { document.getElementById("autoStatus").textContent = m; };
+    const esc = (s) => String(s).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
+
+    // ---------- scene rows ----------
+    const sceneList = document.getElementById("sceneList");
+    function renderScenes() {
+      sceneList.innerHTML = scenes.map((s, i) => {
+        let thumb;
+        if (s.status === "gen-image") thumb = '<span class="spin"></span>';
+        else if (s.thumbUrl) thumb = '<img src="' + s.thumbUrl + '" alt="">';
+        else if (s.status === "image-fail") thumb = '<span style="color:var(--rose);font-size:11px;">failed</span>';
+        else thumb = '<span style="font-size:22px;font-weight:800;">' + (i + 1) + '</span>';
+        const voiceTag = s.status === "gen-voice" ? '<span class="spin"></span>' : (s.audioBlob ? '<span class="ok"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6L9 17l-5-5"/></svg></span>' : '');
+        return '<div class="scene-row" data-i="' + i + '">' +
+          '<div class="scene-thumb"><span class="num">' + (i + 1) + '</span>' + thumb + '</div>' +
+          '<div class="scene-fields">' +
+            '<input class="input" data-field="prompt" data-i="' + i + '" placeholder="Image prompt for this scene" value="' + esc(s.prompt) + '">' +
+            '<input class="input" data-field="narration" data-i="' + i + '" placeholder="Narration for this scene (optional)" value="' + esc(s.narration) + '">' +
+          '</div>' +
+          '<div class="scene-actions">' +
+            '<button class="icon-btn" data-regen="' + i + '" title="Regenerate this scene"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12a9 9 0 1 1-2.6-6.4M21 3v6h-6"/></svg></button>' +
+            '<button class="icon-btn" data-remove="' + i + '" title="Remove" style="color:var(--rose);">' + voiceTag + '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M5 5l14 14M19 5L5 19"/></svg></button>' +
+          '</div>' +
+        '</div>';
+      }).join("");
+    }
+    renderScenes();
+
+    sceneList.addEventListener("input", (e) => {
+      const inp = e.target.closest("input[data-field]");
+      if (inp) { scenes[+inp.getAttribute("data-i")][inp.getAttribute("data-field")] = inp.value; }
+    });
+    sceneList.addEventListener("click", (e) => {
+      const rm = e.target.closest("[data-remove]");
+      if (rm) { scenes.splice(+rm.getAttribute("data-remove"), 1); built = false; document.getElementById("exportBtn").disabled = true; renderScenes(); return; }
+      const rg = e.target.closest("[data-regen]");
+      if (rg) { regenScene(+rg.getAttribute("data-regen")); return; }
+    });
+    document.getElementById("addScene").addEventListener("click", () => {
+      scenes.push({ prompt: "", narration: "", img: null, thumbUrl: null, audioBlob: null, status: "" });
+      renderScenes();
+    });
+
+    // ---------- image generation with retry ----------
+    function loadOne(prompt, seed) {
+      return new Promise((resolve) => {
+        const style = document.getElementById("styleSel").value;
+        const full = prompt + ", " + (styleKW[style] || styleKW.watercolor);
+        const url = "/ai-image/" + encodeURIComponent(full) + "?width=1280&height=720&nologo=true&model=flux&seed=" + seed;
+        const img = new Image();
+        img.onload = () => resolve(img);
+        img.onerror = () => resolve(null);
+        img.src = url;
+      });
+    }
+    async function genImage(prompt, baseSeed) {
+      for (let a = 0; a < 3; a++) {
+        const img = await loadOne(prompt, baseSeed + a * 1000);
+        if (img) return img;
+        if (a < 2) await new Promise((r) => setTimeout(r, 1500));
+      }
+      return null;
+    }
+
+    async function genVoice(text, onProg) {
+      const mod = await import("/natural-voice.js");
+      const voice = document.getElementById("voiceSel").value;
+      return await mod.synthesize(text, voice, onProg);
+    }
+    // Premium voice through your free key, kept server side. Provider is chosen
+    // on the server by whichever key is set, and passed here in data-provider.
+    function xmlEscape(s) { return String(s).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;").replace(/'/g, "&apos;"); }
+    async function genPremiumVoice(text) {
+      const sel = document.getElementById("premiumVoiceSel");
+      const provider = sel.getAttribute("data-provider") || "elevenlabs";
+      const voice = sel.value;
+      if (provider === "local") {
+        const r = await fetch("/local-voice", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ text: text }) });
+        const ct = r.headers.get("content-type") || "";
+        if (!r.ok || ct.indexOf("audio") < 0) throw new Error("local voice unavailable, is the voice server running");
+        return await r.blob();
+      }
+      if (provider === "google") {
+        const lang = voice.slice(0, 5);
+        const r = await fetch("/gtts", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ input: { text: text }, voice: { languageCode: lang, name: voice }, audioConfig: { audioEncoding: "MP3" } }) });
+        if (!r.ok) throw new Error("premium voice unavailable");
+        const j = await r.json();
+        if (!j.audioContent) throw new Error("no audio");
+        const bin = atob(j.audioContent), bytes = new Uint8Array(bin.length);
+        for (let i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i);
+        return new Blob([bytes], { type: "audio/mp3" });
+      }
+      if (provider === "azure") {
+        const lang = voice.slice(0, 5);
+        const ssml = "<speak version='1.0' xml:lang='" + lang + "'><voice xml:lang='" + lang + "' name='" + voice + "'>" + xmlEscape(text) + "</voice></speak>";
+        const r = await fetch("/azure-tts", { method: "POST", headers: { "Content-Type": "application/ssml+xml", "X-Microsoft-OutputFormat": "audio-24khz-48kbitrate-mono-mp3" }, body: ssml });
+        if (!r.ok) throw new Error("premium voice unavailable");
+        return await r.blob();
+      }
+      const r = await fetch("/premium-voice/" + voice, { method: "POST", headers: { "Content-Type": "application/json", "Accept": "audio/mpeg" }, body: JSON.stringify({ text: text, model_id: "eleven_multilingual_v2" }) });
+      const ct = r.headers.get("content-type") || "";
+      if (!r.ok || ct.indexOf("audio") < 0) throw new Error("premium voice unavailable");
+      return await r.blob();
+    }
+
+    async function regenScene(i) {
+      const s = scenes[i];
+      if (!s.prompt.trim()) { window.showToast("Add a prompt for this scene"); return; }
+      s.status = "gen-image"; renderScenes();
+      const img = await genImage(s.prompt, 5000 + i * 37 + Math.floor(total));
+      s.img = img; s.thumbUrl = img ? img.src : null; s.status = img ? "image-ok" : "image-fail";
+      renderScenes();
+      built = false; document.getElementById("exportBtn").disabled = true;
+    }
+
+    async function runGenerate() {
+      document.getElementById("genAll").disabled = true; document.getElementById("makeAll").disabled = true;
+      document.getElementById("buildBtn").disabled = true; document.getElementById("exportBtn").disabled = true;
+      for (let i = 0; i < scenes.length; i++) {
+        const s = scenes[i];
+        if (!s.prompt.trim()) continue;
+        setStatus("Scene " + (i + 1) + " of " + scenes.length + ": generating image");
+        s.status = "gen-image"; renderScenes();
+        const img = await genImage(s.prompt, 4000 + i * 37);
+        s.img = img; s.thumbUrl = img ? img.src : null;
+        if ((narrationMode === "generate" || narrationMode === "premium") && s.narration.trim()) {
+          setStatus("Scene " + (i + 1) + " of " + scenes.length + ": generating voice");
+          s.status = "gen-voice"; renderScenes();
+          try {
+            if (narrationMode === "premium") s.audioBlob = await genPremiumVoice(s.narration);
+            else s.audioBlob = await genVoice(s.narration, (p) => setStatus("Scene " + (i + 1) + ": voice model " + p + "%"));
+          } catch (e) { s.audioBlob = null; if (narrationMode === "premium") setStatus("Premium voice failed. Set your free key, see the guide."); }
+        }
+        s.status = img ? "image-ok" : "image-fail"; renderScenes();
+      }
+      document.getElementById("genAll").disabled = false; document.getElementById("makeAll").disabled = false;
+      const ok = scenes.filter((s) => s.img).length;
+      document.getElementById("buildBtn").disabled = ok === 0;
+      setStatus(ok ? ("Generated " + ok + " scenes.") : "No images generated, check your prompts and try again.");
+      return ok;
+    }
+    document.getElementById("genAll").addEventListener("click", runGenerate);
+
+    // Split a pasted script into as many scenes as it has, with no limit
+    function splitScriptFull(text) {
+      text = text.trim().replace(/[ \t]+/g, " ");
+      let parts = text.split(/\n\s*\n/).map((s) => s.trim().replace(/\n/g, " ")).filter(Boolean);
+      if (parts.length < 2) {
+        const sentences = text.replace(/\n/g, " ").match(/[^.!?]+[.!?]+/g);
+        if (sentences && sentences.length > 1) parts = sentences.map((s) => s.trim()).filter(Boolean);
+      }
+      return parts;
+    }
+    document.getElementById("fillScenes").addEventListener("click", () => {
+      const text = (document.getElementById("scriptPaste").value || "").trim();
+      if (!text) { window.showToast("Paste a script first"); return; }
+      const parts = splitScriptFull(text);
+      if (!parts.length) { window.showToast("Could not split the script"); return; }
+      scenes = parts.map((p) => ({ prompt: p, narration: p, img: null, thumbUrl: null, audioBlob: null, status: "" }));
+      built = false; document.getElementById("buildBtn").disabled = true; document.getElementById("exportBtn").disabled = true;
+      renderScenes();
+      window.showToast(parts.length + " scenes created from your script");
+    });
+
+    // narration mode: generate a voice, upload your own audio, or none
+    document.getElementById("narrModeSeg").addEventListener("click", (e) => {
+      const b = e.target.closest("button"); if (!b) return;
+      document.querySelectorAll("#narrModeSeg button").forEach((n) => n.classList.remove("on"));
+      b.classList.add("on"); narrationMode = b.getAttribute("data-mode");
+      document.getElementById("voicePanel").style.display = narrationMode === "generate" ? "" : "none";
+      document.getElementById("premiumPanel").style.display = narrationMode === "premium" ? "" : "none";
+      document.getElementById("uploadPanel").style.display = narrationMode === "upload" ? "" : "none";
+      document.getElementById("nonePanel").style.display = narrationMode === "none" ? "block" : "none";
+      built = false; document.getElementById("exportBtn").disabled = true;
+    });
+    document.getElementById("uploadAudioBtn").addEventListener("click", () => document.getElementById("audioInput").click());
+    document.getElementById("audioInput").addEventListener("change", (e) => {
+      const f = e.target.files[0]; if (!f) return;
+      uploadedAudioBlob = f; uploadedAudioUrl = URL.createObjectURL(f); uploadedAudioDur = 0;
+      const tmp = new Audio(); tmp.src = uploadedAudioUrl;
+      tmp.onloadedmetadata = () => { uploadedAudioDur = isFinite(tmp.duration) ? tmp.duration : 0; document.getElementById("audioInfo").textContent = f.name + (uploadedAudioDur ? " · " + fmt(uploadedAudioDur) : ""); };
+      document.getElementById("audioRow").style.display = "flex";
+      built = false; document.getElementById("exportBtn").disabled = true;
+      window.showToast("Voiceover uploaded");
+      e.target.value = "";
+    });
+    document.getElementById("audioRemove").addEventListener("click", () => {
+      uploadedAudioBlob = null; uploadedAudioUrl = null; uploadedAudioDur = 0;
+      document.getElementById("audioRow").style.display = "none";
+      built = false; document.getElementById("exportBtn").disabled = true;
+      window.showToast("Audio removed");
+    });
+
+    // background music
+    document.getElementById("musicBtn").addEventListener("click", () => document.getElementById("musicInput").click());
+    document.getElementById("musicInput").addEventListener("change", (e) => {
+      const f = e.target.files[0]; if (!f) return;
+      musicUrl = URL.createObjectURL(f); musicEl.src = musicUrl; musicEl.load(); musicEl.volume = musicVol; hasMusic = true;
+      document.getElementById("musicName").textContent = f.name;
+      document.getElementById("musicRow").style.display = "flex";
+      document.getElementById("musicVolWrap").style.display = "block";
+      built = false; document.getElementById("exportBtn").disabled = true;
+      window.showToast("Background music added");
+      e.target.value = "";
+    });
+    document.getElementById("musicRemove").addEventListener("click", () => {
+      hasMusic = false; musicUrl = null; try { musicEl.pause(); } catch (e) {}
+      document.getElementById("musicRow").style.display = "none";
+      document.getElementById("musicVolWrap").style.display = "none";
+      built = false; document.getElementById("exportBtn").disabled = true;
+      window.showToast("Music removed");
+    });
+    document.getElementById("musicVol").addEventListener("input", (e) => {
+      musicVol = e.target.value / 100; document.getElementById("musicVolVal").textContent = e.target.value + "%";
+      musicEl.volume = musicVol; if (musicGain) musicGain.gain.value = musicVol;
+    });
+
+    // ---------- build the narration track and timings ----------
+    function encodeWAV(buffer) {
+      const sr = buffer.sampleRate, ch = buffer.getChannelData(0), len = ch.length;
+      const ab = new ArrayBuffer(44 + len * 2), view = new DataView(ab);
+      const ws = (o, s) => { for (let i = 0; i < s.length; i++) view.setUint8(o + i, s.charCodeAt(i)); };
+      ws(0, "RIFF"); view.setUint32(4, 36 + len * 2, true); ws(8, "WAVE"); ws(12, "fmt "); view.setUint32(16, 16, true);
+      view.setUint16(20, 1, true); view.setUint16(22, 1, true); view.setUint32(24, sr, true); view.setUint32(28, sr * 2, true);
+      view.setUint16(32, 2, true); view.setUint16(34, 16, true); ws(36, "data"); view.setUint32(40, len * 2, true);
+      let off = 44; for (let i = 0; i < len; i++) { let x = Math.max(-1, Math.min(1, ch[i])); view.setInt16(off, x < 0 ? x * 0x8000 : x * 0x7FFF, true); off += 2; }
+      return new Blob([view], { type: "audio/wav" });
+    }
+    async function buildNarration() {
+      const SR = 24000, gapN = Math.floor(0.35 * SR);
+      const ac = new (window.AudioContext || window.webkitAudioContext)();
+      const parts = [];
+      for (const s of scenes) {
+        if (!s.img) continue;
+        if (s.audioBlob) { const buf = await ac.decodeAudioData(await s.audioBlob.arrayBuffer()); parts.push(buf.getChannelData(0)); }
+        else parts.push(new Float32Array(Math.floor(DEF * SR)));
+      }
+      let totalLen = 0; parts.forEach((p) => totalLen += p.length + gapN);
+      const out = ac.createBuffer(1, Math.max(1, totalLen), SR), od = out.getChannelData(0);
+      let off = 0; const starts = [], durs = [];
+      parts.forEach((p) => { starts.push(off / SR); od.set(p.subarray(0, Math.min(p.length, od.length - off)), off); durs.push(p.length / SR + 0.35); off += p.length + gapN; });
+      ac.close();
+      return { blob: encodeWAV(out), durs, total: totalLen / SR };
+    }
+
+    function ensureGraph() {
+      if (audioCtx) return;
+      audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+      streamDest = audioCtx.createMediaStreamDestination();
+      voiceSrc = audioCtx.createMediaElementSource(narrationEl);
+      voiceSrc.connect(streamDest); voiceSrc.connect(audioCtx.destination);
+      musicSrc = audioCtx.createMediaElementSource(musicEl);
+      musicGain = audioCtx.createGain(); musicGain.gain.value = musicVol;
+      musicSrc.connect(musicGain); musicGain.connect(streamDest); musicGain.connect(audioCtx.destination);
+    }
+
+    async function runBuild() {
+      const withImg = scenes.filter((s) => s.img);
+      const n = withImg.length;
+      if (!n) { window.showToast("Generate images first"); return false; }
+      let blobUrl = null, sTotal = 0;
+      if (narrationMode === "generate" || narrationMode === "premium") {
+        setStatus("Building the narration track");
+        const nar = await buildNarration();
+        sceneDurations = nar.durs; sTotal = nar.total; blobUrl = URL.createObjectURL(nar.blob);
+      } else if (narrationMode === "upload" && uploadedAudioBlob) {
+        let dur = uploadedAudioDur; if (!dur || !isFinite(dur)) dur = n * 4;
+        const per = dur / n; sceneDurations = new Array(n).fill(per); sTotal = dur;
+        blobUrl = uploadedAudioUrl;
+      } else {
+        const per = 4; sceneDurations = new Array(n).fill(per); sTotal = n * per;
+        if (narrationMode === "upload") window.showToast("No audio uploaded, building a silent video");
+      }
+      if (blobUrl) {
+        narrationEl.src = blobUrl; narrationEl.load();
+        await new Promise((res) => { narrationEl.onloadedmetadata = () => res(); narrationEl.onerror = () => res(); });
+        hasAudio = true;
+      } else { hasAudio = false; try { narrationEl.pause(); } catch (e) {} }
+      if (hasAudio || hasMusic) ensureGraph();
+      titleDur = (document.getElementById("titleText").value || "").trim() ? TITLE_DUR : 0;
+      total = titleDur + sTotal;
+      built = true; curT = 0; narrStarted = false; setHead(0); draw(0);
+      document.getElementById("exportBtn").disabled = false;
+      document.getElementById("autoTot").textContent = fmt(total);
+      setStatus("Ready. Press play to preview, or Export MP4.");
+      window.showToast("Video built, " + fmt(total) + " long");
+      return true;
+    }
+    document.getElementById("buildBtn").addEventListener("click", runBuild);
+
+    // ---------- drawing ----------
+    const drawList = () => scenes.filter((s) => s.img);
+    function cover(img, alpha, scale, offsetX) {
+      offsetX = offsetX || 0;
+      ctx.save(); ctx.globalAlpha = alpha;
+      if (img) {
+        const ir = img.width / img.height, cr = W / H; let dw, dh;
+        if (ir > cr) { dh = H * scale; dw = dh * ir; } else { dw = W * scale; dh = dw / ir; }
+        ctx.drawImage(img, (W - dw) / 2 + offsetX, (H - dh) / 2, dw, dh);
+      } else { ctx.fillStyle = "#141726"; ctx.fillRect(offsetX, 0, W, H); }
+      ctx.restore();
+    }
+    function caption(text) {
+      if (!text) return;
+      ctx.save();
+      ctx.font = "600 42px Inter, sans-serif"; ctx.textAlign = "center"; ctx.textBaseline = "middle";
+      const maxW = W - 200, words = text.split(" "); let line = "", lines = [];
+      words.forEach((w) => { const t = line ? line + " " + w : w; if (ctx.measureText(t).width > maxW && line) { lines.push(line); line = w; } else line = t; });
+      if (line) lines.push(line);
+      const lh = 52, bh = lines.length * lh + 24, by = H - bh - 30;
+      ctx.fillStyle = "rgba(5,6,10,.66)"; ctx.fillRect(0, by - 6, W, bh + 12);
+      ctx.fillStyle = "#fff"; let y = by + 26;
+      lines.forEach((ln) => { ctx.fillText(ln, W / 2, y); y += lh; });
+      ctx.restore();
+    }
+    function drawTitleCard(list, t) {
+      if (list[0] && list[0].img) cover(list[0].img, 1, 1.06 + 0.05 * (t / titleDur), 0);
+      else { const g = ctx.createLinearGradient(0, 0, W, H); g.addColorStop(0, "#141726"); g.addColorStop(1, "#222741"); ctx.fillStyle = g; ctx.fillRect(0, 0, W, H); }
+      ctx.save(); ctx.fillStyle = "rgba(5,6,10,.6)"; ctx.fillRect(0, 0, W, H); ctx.restore();
+      let a = 1; if (t < 0.4) a = t / 0.4; else if (t > titleDur - 0.5) a = (titleDur - t) / 0.5;
+      a = Math.max(0, Math.min(1, a));
+      const title = (document.getElementById("titleText").value || "").trim();
+      ctx.save(); ctx.globalAlpha = a; ctx.textAlign = "center"; ctx.textBaseline = "middle";
+      ctx.font = "800 84px Inter, sans-serif";
+      const maxW = W - 240, words = title.split(" "); let line = "", lines = [];
+      words.forEach((w) => { const tt = line ? line + " " + w : w; if (ctx.measureText(tt).width > maxW && line) { lines.push(line); line = w; } else line = tt; });
+      if (line) lines.push(line);
+      const lh = 96; let y = H / 2 - (lines.length - 1) * lh / 2;
+      lines.forEach((ln) => { ctx.lineWidth = 12; ctx.strokeStyle = "rgba(0,0,0,.5)"; ctx.lineJoin = "round"; ctx.strokeText(ln, W / 2, y); ctx.fillStyle = "#fff"; ctx.fillText(ln, W / 2, y); y += lh; });
+      ctx.restore();
+    }
+    function draw(t) {
+      ctx.fillStyle = "#05060a"; ctx.fillRect(0, 0, W, H);
+      const list = drawList();
+      if (!list.length) { ctx.fillStyle = "#6b7299"; ctx.font = "600 34px Inter, sans-serif"; ctx.textAlign = "center"; ctx.textBaseline = "middle"; ctx.fillText("Generate and build to preview", W / 2, H / 2); return; }
+      if (titleDur > 0 && t < titleDur) { drawTitleCard(list, t); return; }
+      const st = t - titleDur;
+      let acc = 0, i = 0, lt = 0;
+      for (i = 0; i < list.length; i++) { const d = sceneDurations[i] || DEF; if (st < acc + d || i === list.length - 1) { lt = st - acc; break; } acc += d; }
+      const d = sceneDurations[i] || DEF; lt = Math.max(0, Math.min(lt, d));
+      const eff = document.getElementById("transSel").value;
+      const TR = Math.min(0.6, d / 2), p = Math.min(1, lt / TR);
+      const scale = 1 + 0.08 * (lt / d);
+      const cur = list[i], prev = list[i - 1];
+      if (eff === "crossfade" && lt < TR && prev) { cover(prev.img, 1, 1.08, 0); cover(cur.img, p, scale, 0); }
+      else if (eff === "slide" && lt < TR && prev) { cover(prev.img, 1, 1, 0); cover(cur.img, 1, 1, (1 - p) * W); }
+      else if (eff === "fade" && lt < TR) { cover(cur.img, 1, scale, 0); ctx.save(); ctx.globalAlpha = 1 - p; ctx.fillStyle = "#000"; ctx.fillRect(0, 0, W, H); ctx.restore(); }
+      else cover(cur.img, 1, scale, 0);
+      const capOn = document.getElementById("capToggle");
+      if (capOn && capOn.checked) caption(cur.narration);
+    }
+
+    // ---------- playback ----------
+    let playing = false, raf = null, startStamp = 0, seekOffset = 0, curT = 0;
+    const playBtn = document.getElementById("autoPlay");
+    function setHead(t) { curT = t; document.getElementById("autoFill").style.width = Math.min(100, (t / (total || 1)) * 100) + "%"; document.getElementById("autoCur").textContent = fmt(t); }
+    function loop(now) {
+      const t = seekOffset + (now - startStamp) / 1000;
+      if (t >= total) { seekOffset = 0; curT = 0; startStamp = now; narrStarted = false; if (hasAudio) { try { narrationEl.pause(); narrationEl.currentTime = 0; } catch (e) {} } if (hasMusic) { try { musicEl.currentTime = 0; } catch (e) {} } draw(0); setHead(0); raf = requestAnimationFrame(loop); return; }
+      if (hasAudio && !narrStarted && t >= titleDur) { try { narrationEl.currentTime = 0; narrationEl.play(); } catch (e) {} narrStarted = true; }
+      draw(t); setHead(t); raf = requestAnimationFrame(loop);
+    }
+    function play() {
+      if (!built) { window.showToast("Build the video first"); return; }
+      playing = true;
+      playBtn.innerHTML = '<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round"><path d="M8 5v14M16 5v14"/></svg>';
+      seekOffset = curT >= total ? 0 : curT;
+      if (audioCtx) { try { if (audioCtx.state === "suspended") audioCtx.resume(); } catch (e) {} }
+      narrStarted = false;
+      if (hasAudio && seekOffset >= titleDur) { try { narrationEl.currentTime = seekOffset - titleDur; narrationEl.play(); narrStarted = true; } catch (e) {} }
+      if (hasMusic) { try { const md = musicEl.duration; musicEl.currentTime = (isFinite(md) && md > 0) ? (seekOffset % md) : 0; musicEl.volume = musicVol; musicEl.play(); } catch (e) {} }
+      startStamp = performance.now(); raf = requestAnimationFrame(loop);
+    }
+    function stop() {
+      playing = false;
+      playBtn.innerHTML = '<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round"><path d="M6 4l14 8-14 8z"/></svg>';
+      cancelAnimationFrame(raf); try { narrationEl.pause(); } catch (e) {} try { musicEl.pause(); } catch (e) {}
+    }
+    playBtn.addEventListener("click", () => { playing ? stop() : play(); });
+    document.getElementById("autoScrub").addEventListener("click", (e) => {
+      if (!built) return;
+      const r = e.currentTarget.getBoundingClientRect();
+      curT = ((e.clientX - r.left) / r.width) * total; draw(curT); setHead(curT);
+      if (playing) {
+        seekOffset = curT; startStamp = performance.now(); narrStarted = false;
+        if (hasAudio) { if (curT >= titleDur) { try { narrationEl.currentTime = curT - titleDur; narrationEl.play(); narrStarted = true; } catch (e2) {} } else { try { narrationEl.pause(); } catch (e2) {} } }
+        if (hasMusic) { try { const md = musicEl.duration; musicEl.currentTime = (isFinite(md) && md > 0) ? (curT % md) : 0; } catch (e3) {} }
+      }
+    });
+
+    // ---------- export ----------
+    let renderCount = 0;
+    function runExport() {
+      return new Promise((resolve) => {
+        if (!built) { resolve(false); return; }
+        stop();
+        const prog = document.getElementById("exportProg"), fill = document.getElementById("exportFill"), btn = document.getElementById("exportBtn");
+        prog.style.display = "block"; btn.disabled = true; setStatus("Rendering the MP4");
+        const fps = 30;
+        const stream = canvas.captureStream(fps);
+        let tracks = stream.getVideoTracks();
+        (async () => {
+          if (hasAudio || hasMusic) { try { if (audioCtx.state === "suspended") await audioCtx.resume(); tracks = tracks.concat(streamDest.stream.getAudioTracks()); } catch (e) {} }
+          const mixed = new MediaStream(tracks);
+          let mime = "video/mp4;codecs=avc1.42E01E,mp4a.40.2", ext = "mp4";
+          if (!MediaRecorder.isTypeSupported(mime)) { mime = MediaRecorder.isTypeSupported("video/mp4") ? "video/mp4" : "video/webm;codecs=vp9,opus"; ext = mime.indexOf("mp4") >= 0 ? "mp4" : "webm"; }
+          const rec = new MediaRecorder(mixed, { mimeType: mime, videoBitsPerSecond: 6000000 });
+          const chunks = []; rec.ondataavailable = (e) => { if (e.data.size) chunks.push(e.data); };
+          rec.onstop = () => {
+            const blob = new Blob(chunks, { type: ext === "mp4" ? "video/mp4" : "video/webm" });
+            renderCount++;
+            const url = URL.createObjectURL(blob);
+            const row = document.createElement("div"); row.className = "render-row";
+            row.innerHTML = '<div class="ico green" style="width:32px;height:32px;border-radius:9px;flex-shrink:0;"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><rect x="2.5" y="4" width="19" height="16" rx="2.5"/><path d="M10 9l6 3-6 3z"/></svg></div>' +
+              '<div style="flex:1;min-width:0;"><div style="font-weight:600;font-size:12.5px;">video_' + renderCount + '.' + ext + '</div><div class="faint" style="font-size:11px;">' + (blob.size / 1048576).toFixed(1) + ' MB</div></div>' +
+              '<a class="btn sm primary" href="' + url + '" download="creatorflow_video_' + renderCount + '.' + ext + '">Save</a>';
+            document.getElementById("renderHistory").insertBefore(row, document.getElementById("renderHistory").firstChild);
+            prog.style.display = "none"; btn.disabled = false;
+            setStatus("Saved. Your video is ready.");
+            window.showToast(ext.toUpperCase() + " video ready");
+            resolve(true);
+          };
+          rec.start();
+          narrStarted = false;
+          if (hasMusic) { try { musicEl.currentTime = 0; musicEl.volume = musicVol; musicEl.play(); } catch (e) {} }
+          if (hasAudio && titleDur === 0) { try { narrationEl.currentTime = 0; narrationEl.play(); } catch (e) {} narrStarted = true; }
+          const begin = performance.now(); let fin = false;
+          function finish() { if (fin) return; fin = true; clearInterval(drv); try { narrationEl.pause(); } catch (e) {} try { musicEl.pause(); } catch (e) {} if (rec.state !== "inactive") rec.stop(); }
+          const drv = setInterval(() => {
+            const t = (performance.now() - begin) / 1000;
+            if (t >= total) { finish(); return; }
+            if (hasAudio && !narrStarted && t >= titleDur) { try { narrationEl.currentTime = 0; narrationEl.play(); } catch (e) {} narrStarted = true; }
+            draw(t); setHead(t); fill.style.width = Math.min(100, (t / total) * 100) + "%";
+          }, 1000 / fps);
+          setTimeout(finish, total * 1000 + 800);
+        })();
+      });
+    }
+    document.getElementById("exportBtn").addEventListener("click", runExport);
+
+    // ---------- one press: generate, build, and export in sequence ----------
+    document.getElementById("makeAll").addEventListener("click", async () => {
+      const makeBtn = document.getElementById("makeAll");
+      makeBtn.disabled = true;
+      const ok = await runGenerate();
+      if (!ok) { makeBtn.disabled = false; window.showToast("No images generated, check your prompts"); return; }
+      const b = await runBuild();
+      if (!b) { makeBtn.disabled = false; return; }
+      setStatus("Rendering the whole video, this runs in real time");
+      await runExport();
+      makeBtn.disabled = false;
+    });
+
+    draw(0);
+  })();
+  </script>
+</Layout>

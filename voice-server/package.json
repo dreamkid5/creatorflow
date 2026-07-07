@@ -1,0 +1,11 @@
+{
+  "name": "creatorflow-voice-server",
+  "private": true,
+  "type": "module",
+  "version": "1.0.0",
+  "description": "Local no card voice server for CreatorFlow, wrapping the free Piper voice engine.",
+  "scripts": {
+    "start": "node server.mjs"
+  },
+  "engines": { "node": ">=18" }
+}

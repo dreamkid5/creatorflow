@@ -1,0 +1,308 @@
+---
+import Layout from "../layouts/Layout.astro";
+import Icon from "../components/Icon.astro";
+import { adminStats, adminUsers, moderationQueue, featureFlags, apiKeys, systemHealth, roles, permissionMatrix, teamMembers } from "../data/demo.js";
+
+const roleName = (k) => (roles.find((r) => r.key === k) || {}).name || k;
+const roleColor = (k) => (roles.find((r) => r.key === k) || {}).color || "var(--muted)";
+
+const planBadge = (p) => p === "Studio" ? "scheduled" : p === "Pro" ? "ready" : "draft";
+const statusBadge = (s) => s === "active" ? "published" : s === "suspended" ? "draft" : "scheduled";
+const label = (s) => s.charAt(0).toUpperCase() + s.slice(1);
+---
+<Layout title="Admin Panel" subtitle="Oversee the whole platform from one control center" active="admin" page="Admin Panel">
+
+  <div class="flex center between" style="margin-bottom:20px;">
+    <span class="admin-badge"><Icon name="shield" size={15} />Administrator access</span>
+    <div class="flex center gap-10">
+      {systemHealth.map((h) => (
+        <span class="flex center" style="gap:6px;font-size:12px;font-weight:600;color:var(--muted);">
+          <span class={`status-dot ${h.status}`}></span>{h.name}
+        </span>
+      ))}
+    </div>
+  </div>
+
+  <!-- Platform stats -->
+  <section class="grid g-4">
+    {adminStats.map((s) => (
+      <div class="card stat">
+        <div class="top">
+          <div class={`ico ${s.color}`}><Icon name={s.icon} size={21} /></div>
+          <div class="label">{s.label}</div>
+        </div>
+        <div class="value">{s.value}</div>
+        <div class="foot">
+          <span class={`trend ${s.up ? "up" : "down"}`}><Icon name={s.up ? "up" : "down"} size={13} />{s.trend}%</span>
+          <span class="cmp">this month</span>
+        </div>
+      </div>
+    ))}
+  </section>
+
+  <!-- User management -->
+  <section class="mt-18">
+    <div class="card">
+      <div class="card-head">
+        <div><h3>User management</h3><p>Every account on the platform</p></div>
+        <div class="actions">
+          <div class="search" style="width:220px;">
+            <Icon name="search" size={16} />
+            <input id="userSearch" type="text" placeholder="Search users" />
+          </div>
+        </div>
+      </div>
+      <div class="card-body" style="padding:0; overflow-x:auto;">
+        <table class="table" style="min-width:760px;">
+          <thead><tr><th>Account</th><th>Plan</th><th>Channels</th><th>Status</th><th>Joined</th><th></th></tr></thead>
+          <tbody id="userBody">
+            {adminUsers.map((u) => (
+              <tr data-name={u.name.toLowerCase() + " " + u.email.toLowerCase()}>
+                <td>
+                  <div class="vid-title">{u.name}<div class="sub">{u.email}</div></div>
+                </td>
+                <td><span class={`badge ${planBadge(u.plan)}`}><span class="d"></span>{u.plan}</span></td>
+                <td style="font-weight:700;">{u.channels}</td>
+                <td><span class={`badge ${statusBadge(u.status)}`}><span class="d"></span>{label(u.status)}</span></td>
+                <td class="muted">{u.joined}</td>
+                <td style="text-align:right;"><button class="btn sm ghost">Manage</button></td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+        <div class="empty-note" id="userEmpty" style="display:none;">No accounts match that search.</div>
+      </div>
+    </div>
+  </section>
+
+  <!-- Team and roles -->
+  <section class="mt-18">
+    <div class="card">
+      <div class="card-head">
+        <div><h3>Team and roles</h3><p>People who can work in this workspace</p></div>
+        <div class="actions"><button class="btn primary sm" id="inviteBtn"><Icon name="plus" size={14} />Invite member</button></div>
+      </div>
+      <div class="card-body" style="padding:0; overflow-x:auto;">
+        <table class="table" style="min-width:640px;">
+          <thead><tr><th>Member</th><th>Role</th><th>Access</th><th>Status</th><th></th></tr></thead>
+          <tbody id="teamBody">
+            {teamMembers.map((m, i) => (
+              <tr data-i={i}>
+                <td>
+                  <div class="vid-cell">
+                    <div class="inbox-av" style={`width:38px;height:38px;font-size:13px;background:${m.color}`}>{m.av}</div>
+                    <div class="vid-title">{m.name}<div class="sub">{m.email}</div></div>
+                  </div>
+                </td>
+                <td>
+                  {m.role === "owner" ? (
+                    <span class="badge" style="background:rgba(255,45,85,.12);color:var(--brand2);"><span class="d" style="background:var(--brand2)"></span>Owner</span>
+                  ) : (
+                    <select class="select role-sel" data-i={i} style="width:150px;padding:8px 12px;font-size:13px;">
+                      {roles.filter((r) => r.key !== "owner").map((r) => (
+                        <option value={r.key} selected={r.key === m.role}>{r.name}</option>
+                      ))}
+                    </select>
+                  )}
+                </td>
+                <td class="muted" style="font-size:12.5px;max-width:240px;">{(roles.find((r) => r.key === m.role) || {}).desc}</td>
+                <td><span class={`badge ${m.status === "active" ? "published" : "scheduled"}`}><span class="d"></span>{m.status === "active" ? "Active" : "Invited"}</span></td>
+                <td style="text-align:right;">
+                  {m.role !== "owner" && <button class="btn sm ghost" data-remove={i} style="color:var(--rose);">Remove</button>}
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </section>
+
+  <!-- Role permissions -->
+  <section class="mt-18">
+    <div class="card">
+      <div class="card-head"><div><h3>Role permissions</h3><p>What each role is allowed to do</p></div></div>
+      <div class="card-body" style="overflow-x:auto;">
+        <table class="table" style="min-width:640px;">
+          <thead>
+            <tr>
+              <th>Capability</th>
+              {roles.map((r) => <th style="text-align:center;">{r.name}</th>)}
+            </tr>
+          </thead>
+          <tbody>
+            {permissionMatrix.map((row) => (
+              <tr>
+                <td style="font-weight:600;">{row.area}</td>
+                {roles.map((r) => (
+                  <td style="text-align:center;">
+                    {row[r.key] ? (
+                      <span style="color:var(--green);display:inline-grid;place-items:center;"><Icon name="check" size={16} /></span>
+                    ) : (
+                      <span class="status-dot" style="background:var(--border2);"></span>
+                    )}
+                  </td>
+                ))}
+              </tr>
+            ))}
+          </tbody>
+        </table>
+        <div class="legend" style="margin-top:16px;">
+          {roles.map((r) => (
+            <div class="li"><span class="d" style={`background:${r.color}`}></span>{r.name}: {r.desc}</div>
+          ))}
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section class="grid g-2 mt-18">
+    <!-- Moderation -->
+    <div class="card">
+      <div class="card-head">
+        <div><h3>Moderation queue</h3><p>Items waiting on a decision</p></div>
+        <div class="actions"><span class="badge red" style="background:rgba(255,45,85,.12);color:var(--brand2);"><span class="d" style="background:var(--brand2)"></span>{moderationQueue.length} open</span></div>
+      </div>
+      <div class="card-body" style="padding-top:8px;" id="modBody">
+        {moderationQueue.map((m, i) => (
+          <div class="lrow" data-mod={i} style="align-items:flex-start;">
+            <div class={`ico ${m.severity === "high" ? "red" : "amber"}`} style="width:34px;height:34px;border-radius:9px;flex-shrink:0;"><Icon name="flag" size={16} /></div>
+            <div class="grow">
+              <div class="t" style="white-space:normal;font-weight:600;">{m.type}: {m.detail}</div>
+              <div class="s">by {m.user} · severity {m.severity}</div>
+            </div>
+            <div class="flex gap-10">
+              <button class="btn sm" data-mod-act="approve">Approve</button>
+              <button class="btn sm ghost" data-mod-act="remove" style="color:var(--rose);">Remove</button>
+            </div>
+          </div>
+        ))}
+        <div class="empty-note" id="modEmpty" style="display:none;">Queue is clear. Nice work.</div>
+      </div>
+    </div>
+
+    <!-- Feature flags -->
+    <div class="card">
+      <div class="card-head"><div><h3>Feature flags</h3><p>Roll features in and out</p></div></div>
+      <div class="card-body" style="padding-top:8px;">
+        {featureFlags.map((f, i) => (
+          <div class="flex between center" style={`padding:12px 0;${i ? "border-top:1px solid var(--border);" : ""}`}>
+            <div>
+              <div style="font-weight:600;font-size:13.5px;">{f.name}</div>
+              <div class="mono faint" style="font-size:11.5px;">{f.key}</div>
+            </div>
+            <label class="switch"><input type="checkbox" checked={f.on} /><span class="track"></span></label>
+          </div>
+        ))}
+      </div>
+    </div>
+  </section>
+
+  <section class="grid g-2 mt-18">
+    <!-- API keys -->
+    <div class="card">
+      <div class="card-head">
+        <div><h3>API keys</h3><p>Access for the public analytics API</p></div>
+        <div class="actions"><button class="btn sm"><Icon name="plus" size={14} />New key</button></div>
+      </div>
+      <div class="card-body" style="padding-top:8px;">
+        {apiKeys.map((k, i) => (
+          <div class="flex between center" style={`padding:13px 0;${i ? "border-top:1px solid var(--border);" : ""}`}>
+            <div style="min-width:0;">
+              <div style="font-weight:600;font-size:13.5px;">{k.label}</div>
+              <div class="mono faint keyval" data-full={k.value} style="font-size:12px;">{"cf_" + "•".repeat(16)}</div>
+              <div class="faint" style="font-size:11px;margin-top:2px;">Created {k.created} · used {k.last}</div>
+            </div>
+            <div class="flex gap-10">
+              <button class="icon-btn" style="width:34px;height:34px;" data-reveal title="Reveal"><Icon name="eye" size={16} /></button>
+              <button class="icon-btn" style="width:34px;height:34px;" data-copy={k.value} title="Copy"><Icon name="copy" size={16} /></button>
+            </div>
+          </div>
+        ))}
+      </div>
+    </div>
+
+    <!-- System health -->
+    <div class="card">
+      <div class="card-head"><div><h3>System health</h3><p>Live service status</p></div></div>
+      <div class="card-body" style="padding-top:8px;">
+        {systemHealth.map((h, i) => (
+          <div class="flex between center" style={`padding:13px 0;${i ? "border-top:1px solid var(--border);" : ""}`}>
+            <div class="flex center gap-10">
+              <span class={`status-dot ${h.status}`}></span>
+              <div>
+                <div style="font-weight:600;font-size:13.5px;">{h.name}</div>
+                <div class="faint" style="font-size:11.5px;">{h.note}</div>
+              </div>
+            </div>
+            <span class={`badge ${h.status === "ok" ? "published" : h.status === "warn" ? "scheduled" : "draft"}`}><span class="d"></span>{h.status === "ok" ? "Operational" : h.status === "warn" ? "Degraded" : "Down"}</span>
+          </div>
+        ))}
+      </div>
+    </div>
+  </section>
+
+  <script is:inline>
+    // user search
+    const ub = document.getElementById("userBody");
+    document.getElementById("userSearch").addEventListener("input", (e) => {
+      const q = e.target.value.toLowerCase();
+      let shown = 0;
+      ub.querySelectorAll("tr").forEach((row) => {
+        const match = row.getAttribute("data-name").includes(q);
+        row.style.display = match ? "" : "none";
+        if (match) shown++;
+      });
+      document.getElementById("userEmpty").style.display = shown ? "none" : "block";
+    });
+
+    // moderation actions
+    const modBody = document.getElementById("modBody");
+    modBody.addEventListener("click", (e) => {
+      const btn = e.target.closest("[data-mod-act]");
+      if (!btn) return;
+      const row = btn.closest("[data-mod]");
+      row.style.transition = "opacity .2s";
+      row.style.opacity = "0";
+      window.showToast(btn.getAttribute("data-mod-act") === "approve" ? "Item approved" : "Item removed");
+      setTimeout(() => {
+        row.remove();
+        if (!modBody.querySelector("[data-mod]")) document.getElementById("modEmpty").style.display = "block";
+      }, 220);
+    });
+
+    // team roles
+    const teamBody = document.getElementById("teamBody");
+    if (teamBody) {
+      teamBody.addEventListener("change", (e) => {
+        const sel = e.target.closest(".role-sel");
+        if (sel) {
+          const name = sel.closest("tr").querySelector(".vid-title").childNodes[0].textContent.trim();
+          window.showToast(name + " is now " + sel.options[sel.selectedIndex].text);
+        }
+      });
+      teamBody.addEventListener("click", (e) => {
+        const rm = e.target.closest("[data-remove]");
+        if (rm) {
+          const row = rm.closest("tr");
+          row.style.transition = "opacity .2s";
+          row.style.opacity = "0";
+          window.showToast("Member removed from workspace");
+          setTimeout(() => row.remove(), 220);
+        }
+      });
+    }
+    const inviteBtn = document.getElementById("inviteBtn");
+    if (inviteBtn) inviteBtn.addEventListener("click", () => window.showToast("Invite link copied to clipboard"));
+
+    // reveal api keys
+    document.querySelectorAll("[data-reveal]").forEach((btn) => {
+      btn.addEventListener("click", () => {
+        const val = btn.closest(".flex").parentElement.querySelector(".keyval");
+        const full = val.getAttribute("data-full");
+        if (val.textContent.includes("•")) val.textContent = full;
+        else val.textContent = "cf_" + "•".repeat(16);
+      });
+    });
+  </script>
+</Layout>

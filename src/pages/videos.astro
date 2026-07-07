@@ -1,0 +1,204 @@
+---
+import Layout from "../layouts/Layout.astro";
+import Icon from "../components/Icon.astro";
+---
+<Layout title="Videos" subtitle="Manage your video library" active="videos" page="Videos">
+
+  <div class="section-head">
+    <div><h2>Content library</h2><p id="vidCountText">Load the folder where your finished videos are saved</p></div>
+    <div class="actions">
+      <button class="btn" id="loadBtn"><Icon name="folder" size={15} />Load from folder</button>
+      <a href="/auto" class="btn primary"><Icon name="plus" size={16} />New video</a>
+    </div>
+  </div>
+
+  <div id="bulkBar" style="display:none; align-items:center; gap:10px; margin-bottom:14px;">
+    <span id="selCount" style="font-weight:700; font-size:13px;">0 selected</span>
+    <button class="btn sm" id="delSel" style="color:var(--rose); border-color:var(--rose);"><Icon name="stop" size={14} />Delete selected</button>
+    <button class="btn sm ghost" id="clearSel">Clear</button>
+  </div>
+
+  <div class="card">
+    <div class="card-body" style="padding:0; overflow-x:auto;">
+      <table class="table" id="vidTable" style="min-width:620px; display:none;">
+        <thead>
+          <tr>
+            <th style="width:40px; text-align:center;"><input type="checkbox" id="selAll" aria-label="Select all" /></th>
+            <th>Video</th>
+            <th>Size</th>
+            <th></th>
+          </tr>
+        </thead>
+        <tbody id="vidBody"></tbody>
+      </table>
+      <div class="empty-note" id="vidEmpty">
+        No videos loaded yet. Click <strong>Load from folder</strong> and choose your CreatorFlow Videos folder, or make a new one on the Auto Video page.
+      </div>
+    </div>
+  </div>
+
+  <!-- Player modal -->
+  <div class="modal-overlay" id="playerModal">
+    <div class="modal">
+      <div class="modal-head">
+        <Icon name="play" size={18} />
+        <div><h3 id="pmTitle">Now playing</h3><p id="pmSub"></p></div>
+        <button class="modal-close" data-close><Icon name="stop" size={16} /></button>
+      </div>
+      <div class="modal-body">
+        <div class="player-frame"><video id="pmVideo" controls playsinline style="width:100%; border-radius:12px; background:#000; display:block;"></video></div>
+        <div class="flex gap-10" style="margin-top:16px;">
+          <button class="btn" data-close>Close</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script is:inline>
+    (function () {
+      const supported = typeof window.showDirectoryPicker === "function";
+      const loadBtn = document.getElementById("loadBtn");
+      const body = document.getElementById("vidBody");
+      const table = document.getElementById("vidTable");
+      const empty = document.getElementById("vidEmpty");
+      const bulkBar = document.getElementById("bulkBar");
+      const selAll = document.getElementById("selAll");
+      let dirHandle = null;
+      let rows = []; // { name, size, url, handle }
+
+      if (!supported) {
+        loadBtn.disabled = true;
+        empty.innerHTML = "Loading a folder needs Google Chrome or Microsoft Edge on a computer. Your finished videos are in the CreatorFlow Videos folder on your Desktop, and you can open them from there.";
+      }
+
+      function human(bytes) {
+        if (bytes < 1024) return bytes + " B";
+        if (bytes < 1048576) return (bytes / 1024).toFixed(0) + " KB";
+        if (bytes < 1073741824) return (bytes / 1048576).toFixed(1) + " MB";
+        return (bytes / 1073741824).toFixed(2) + " GB";
+      }
+
+      function updateCount() {
+        const n = rows.length;
+        document.getElementById("vidCountText").textContent =
+          n ? (n + (n === 1 ? " video in this folder" : " videos in this folder")) : "Load the folder where your finished videos are saved";
+        table.style.display = n ? "" : "none";
+        empty.style.display = n ? "none" : "block";
+      }
+
+      function updateSel() {
+        const checked = body.querySelectorAll(".vidSel:checked");
+        document.getElementById("selCount").textContent = checked.length + " selected";
+        bulkBar.style.display = checked.length ? "flex" : "none";
+      }
+
+      function render() {
+        body.innerHTML = "";
+        rows.forEach((r, i) => {
+          const tr = document.createElement("tr");
+          tr.innerHTML =
+            '<td style="text-align:center;"><input type="checkbox" class="vidSel" data-i="' + i + '" aria-label="Select"></td>' +
+            '<td><div class="vid-cell"><button class="vid-thumb" data-play="' + i + '" style="font-size:22px;cursor:pointer;border:none;">🎬</button>' +
+            '<div class="vid-title" style="max-width:360px;">' + r.name + '</div></div></td>' +
+            '<td class="muted">' + human(r.size) + '</td>' +
+            '<td style="text-align:right; white-space:nowrap;">' +
+            '<button class="btn sm" data-play="' + i + '">Play</button> ' +
+            '<button class="btn sm ghost" data-del="' + i + '" style="color:var(--rose);">Delete</button></td>';
+          body.appendChild(tr);
+        });
+        updateCount();
+        updateSel();
+        if (selAll) selAll.checked = false;
+      }
+
+      async function loadFolder() {
+        try {
+          dirHandle = await window.showDirectoryPicker();
+          rows.forEach((r) => { try { URL.revokeObjectURL(r.url); } catch (e) {} });
+          rows = [];
+          for await (const entry of dirHandle.values()) {
+            if (entry.kind === "file" && /\.(mp4|webm|mov|m4v)$/i.test(entry.name)) {
+              const file = await entry.getFile();
+              rows.push({ name: entry.name, size: file.size, url: URL.createObjectURL(file), handle: entry });
+            }
+          }
+          rows.sort((a, b) => a.name.localeCompare(b.name));
+          render();
+          window.showToast && window.showToast(rows.length ? "Loaded " + rows.length + " video" + (rows.length === 1 ? "" : "s") : "No videos found in that folder");
+        } catch (e) {
+          // user cancelled the picker, nothing to do
+        }
+      }
+
+      async function deleteRows(indexes) {
+        if (!indexes.length) return;
+        const msg = indexes.length === 1
+          ? "Delete this video from the folder? This cannot be undone."
+          : "Delete these " + indexes.length + " videos from the folder? This cannot be undone.";
+        if (!window.confirm(msg)) return;
+        // remove highest index first so positions stay valid
+        const sorted = indexes.slice().sort((a, b) => b - a);
+        let removed = 0;
+        for (const i of sorted) {
+          const r = rows[i];
+          if (!r) continue;
+          try {
+            if (dirHandle && dirHandle.removeEntry) await dirHandle.removeEntry(r.name);
+            try { URL.revokeObjectURL(r.url); } catch (e) {}
+            rows.splice(i, 1);
+            removed++;
+          } catch (e) {
+            window.showToast && window.showToast("Could not delete " + r.name);
+          }
+        }
+        render();
+        if (removed) window.showToast && window.showToast(removed + " video" + (removed === 1 ? "" : "s") + " deleted");
+      }
+
+      loadBtn.addEventListener("click", loadFolder);
+
+      // play and per row delete
+      body.addEventListener("click", (e) => {
+        const p = e.target.closest("[data-play]");
+        if (p) {
+          const r = rows[parseInt(p.getAttribute("data-play"), 10)];
+          if (!r) return;
+          const v = document.getElementById("pmVideo");
+          v.src = r.url;
+          document.getElementById("pmTitle").textContent = r.name;
+          document.getElementById("pmSub").textContent = human(r.size);
+          document.getElementById("playerModal").classList.add("open");
+          v.play().catch(() => {});
+          return;
+        }
+        const d = e.target.closest("[data-del]");
+        if (d) { deleteRows([parseInt(d.getAttribute("data-del"), 10)]); return; }
+      });
+
+      // selection
+      body.addEventListener("change", (e) => { if (e.target.classList.contains("vidSel")) updateSel(); });
+      selAll.addEventListener("change", () => {
+        body.querySelectorAll(".vidSel").forEach((cb) => { cb.checked = selAll.checked; });
+        updateSel();
+      });
+      document.getElementById("clearSel").addEventListener("click", () => {
+        body.querySelectorAll(".vidSel").forEach((cb) => { cb.checked = false; });
+        selAll.checked = false;
+        updateSel();
+      });
+      document.getElementById("delSel").addEventListener("click", () => {
+        const idx = Array.from(body.querySelectorAll(".vidSel:checked")).map((cb) => parseInt(cb.getAttribute("data-i"), 10));
+        deleteRows(idx);
+      });
+
+      // close modal, stop playback
+      document.addEventListener("click", (e) => {
+        if (e.target.closest("[data-close]") || (e.target.classList && e.target.classList.contains("modal-overlay"))) {
+          const v = document.getElementById("pmVideo");
+          try { v.pause(); v.removeAttribute("src"); v.load(); } catch (err) {}
+          document.getElementById("playerModal").classList.remove("open");
+        }
+      });
+    })();
+  </script>
+</Layout>

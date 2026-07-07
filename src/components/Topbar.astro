@@ -1,0 +1,39 @@
+---
+import Icon from "./Icon.astro";
+import { channel } from "../data/demo.js";
+const { title, subtitle } = Astro.props;
+---
+<header class="topbar">
+  <button class="icon-btn menu-btn" id="menuBtn" aria-label="Open menu">
+    <Icon name="menu" />
+  </button>
+
+  <div class="page-title">
+    <h1>{title}</h1>
+    {subtitle && <p>{subtitle}</p>}
+  </div>
+
+  <div class="topbar-actions">
+    <div class="search">
+      <Icon name="search" size={17} />
+      <input class="txt" type="text" placeholder="Search videos, ideas, tags" />
+    </div>
+
+    <button class="icon-btn" id="themeToggle" aria-label="Toggle theme" title="Toggle light and dark">
+      <Icon name="bulb" size={19} />
+    </button>
+
+    <button class="icon-btn" aria-label="Notifications">
+      <Icon name="bell" size={19} />
+      <span class="dot"></span>
+    </button>
+
+    <div class="avatar">
+      <div class="ph">{channel.avatar}</div>
+      <div class="meta">
+        <div class="n">{channel.name}</div>
+        <div class="r">{channel.handle}</div>
+      </div>
+    </div>
+  </div>
+</header>

@@ -1,0 +1,37 @@
+---
+import Icon from "./Icon.astro";
+const { label, value, trend, up, cmp, color, icon, spark = [] } = Astro.props;
+
+// build a tiny sparkline path
+let sparkPath = "";
+if (spark.length) {
+  const w = 72, h = 30;
+  const max = Math.max(...spark), min = Math.min(...spark);
+  const span = (max - min) || 1;
+  sparkPath = spark.map((v, i) => {
+    const x = (i / (spark.length - 1)) * w;
+    const y = h - ((v - min) / span) * h;
+    return `${i === 0 ? "M" : "L"} ${x.toFixed(1)} ${y.toFixed(1)}`;
+  }).join(" ");
+}
+const sparkColor = up ? "var(--green)" : "var(--rose)";
+---
+<div class="card stat">
+  <div class="top">
+    <div class={`ico ${color}`}><Icon name={icon} size={21} /></div>
+    <div class="label">{label}</div>
+  </div>
+  <div class="value">{value}</div>
+  <div class="foot">
+    <span class={`trend ${up ? "up" : "down"}`}>
+      <Icon name={up ? "up" : "down"} size={13} />
+      {trend}%
+    </span>
+    <span class="cmp">{cmp}</span>
+  </div>
+  {spark.length > 0 && (
+    <svg class="spark" width="72" height="30" viewBox="0 0 72 30" fill="none">
+      <path d={sparkPath} stroke={sparkColor} stroke-width="2" stroke-linecap="round" stroke-linejoin="round" />
+    </svg>
+  )}
+</div>

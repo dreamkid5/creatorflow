@@ -1,0 +1,1073 @@
+---
+import Layout from "../layouts/Layout.astro";
+import Icon from "../components/Icon.astro";
+---
+<Layout title="Video Studio" subtitle="Turn images and audio into a finished video" active="create" page="Video Studio">
+
+  <section class="grid vstudio-cols" style="grid-template-columns: minmax(0, 1fr) 340px; gap:18px; align-items:start;">
+
+    <!-- Stage and timeline -->
+    <div class="studio-left" style="display:flex; flex-direction:column; gap:16px; min-width:0;">
+      <div class="card pad">
+        <div class="studio-stage">
+          <canvas id="stage" width="1280" height="720"></canvas>
+        </div>
+
+        <!-- Transport -->
+        <div class="transport">
+          <button class="play-btn" id="playBtn" aria-label="Play"><Icon name="play" size={20} /></button>
+          <span class="time" id="curTime">0:00</span>
+          <div class="scrub" id="scrub"><div class="fill" id="scrubFill"></div></div>
+          <span class="time" id="totTime">0:00</span>
+        </div>
+      </div>
+
+      <!-- Timeline -->
+      <div class="timeline">
+        <div class="track-label"><Icon name="layers" size={14} />Visual track</div>
+        <div class="track" id="clipTrack">
+          <button class="clip-add" id="addClipBtn" title="Add image"><Icon name="plus" size={20} /></button>
+        </div>
+
+        <div class="track-label" style="margin-top:16px;"><Icon name="music" size={14} />Audio track</div>
+        <div class="track audio" id="audioTrack">
+          <div class="audio-empty" id="audioEmpty">No audio yet. Add a voiceover or music track to align your clips.</div>
+          <div class="wave" id="wave" style="display:none;"></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Control panel -->
+    <div style="display:flex; flex-direction:column; gap:16px; min-width:0;">
+
+      <!-- Add media -->
+      <div class="card">
+        <div class="card-head"><div><h3>Add media</h3><p>Build your sequence</p></div></div>
+        <div class="card-body">
+          <button class="btn primary" id="uploadImg" style="width:100%;justify-content:center;margin-bottom:10px;"><Icon name="image" size={16} />Add images</button>
+          <button class="btn" id="uploadVideo" style="width:100%;justify-content:center;margin-bottom:10px;"><Icon name="film" size={16} />Add video clips</button>
+          <button class="btn" id="uploadAudio" style="width:100%;justify-content:center;"><Icon name="mic" size={16} />Add voiceover</button>
+          <p class="hint" style="margin-top:10px;">Mix images and video clips freely. A sample sequence is loaded so you can preview and export right away.</p>
+        </div>
+      </div>
+
+      <!-- Story builder -->
+      <div class="card" style="border-color:var(--violet);box-shadow:inset 0 0 0 1px var(--violet),var(--glow);">
+        <div class="card-head"><div><h3>Story builder</h3><p>One script becomes a full video</p></div></div>
+        <div class="card-body">
+          <div class="field">
+            <label>Paste your narration script</label>
+            <textarea class="textarea" id="storyScript" style="min-height:110px;" placeholder="Paste your full narration script. Each paragraph or sentence becomes its own illustrated scene."></textarea>
+          </div>
+          <div class="field" style="margin-bottom:12px;">
+            <label>Art style</label>
+            <select class="select" id="storyStyle">
+              <option value="watercolor">Watercolor illustration</option>
+              <option value="cinematic">Cinematic photo</option>
+              <option value="storybook">Storybook painting</option>
+              <option value="anime">Anime</option>
+              <option value="3d">3D render</option>
+              <option value="flat">Flat vector</option>
+              <option value="oil">Oil painting</option>
+              <option value="pencil">Pencil sketch</option>
+              <option value="comic">Comic book</option>
+              <option value="papercut">Paper cut</option>
+              <option value="fantasy">Fantasy art</option>
+              <option value="vintage">Vintage photo</option>
+              <option value="pixel">Pixel art</option>
+              <option value="claymation">Claymation</option>
+              <option value="lineart">Line art</option>
+              <option value="synthwave">Synthwave neon</option>
+              <option value="folktale">African folktale</option>
+            </select>
+          </div>
+          <button class="btn primary" id="buildStory" style="width:100%;justify-content:center;"><Icon name="sparkles" size={16} />Build story from script</button>
+          <div id="storyProg" class="hint" style="margin-top:8px;text-align:center;display:none;">Building scene 1</div>
+          <p class="hint" style="margin-top:8px;">Splits the script into scenes, illustrates each one, and loads the script into Narration. Then add a voiceover and press Auto fit.</p>
+        </div>
+      </div>
+
+      <!-- AI scene generator -->
+      <div class="card">
+        <div class="card-head"><div><h3>AI scene generator</h3><p>Make scene images from prompts</p></div></div>
+        <div class="card-body">
+          <div class="field">
+            <label>Scene prompts, one per line</label>
+            <textarea class="textarea" id="scenePrompts" style="min-height:92px;" placeholder="A Roman man at a candlelit desk with a scroll, night
+A field of valerian flowers at dawn
+A close up of dried valerian root and a mortar"></textarea>
+          </div>
+          <div class="field" style="margin-bottom:12px;">
+            <label>Art style</label>
+            <select class="select" id="sceneStyle">
+              <option value="watercolor">Watercolor illustration</option>
+              <option value="cinematic">Cinematic photo</option>
+              <option value="storybook">Storybook painting</option>
+              <option value="anime">Anime</option>
+              <option value="3d">3D render</option>
+              <option value="flat">Flat vector</option>
+              <option value="oil">Oil painting</option>
+              <option value="pencil">Pencil sketch</option>
+              <option value="comic">Comic book</option>
+              <option value="papercut">Paper cut</option>
+              <option value="fantasy">Fantasy art</option>
+              <option value="vintage">Vintage photo</option>
+              <option value="pixel">Pixel art</option>
+              <option value="claymation">Claymation</option>
+              <option value="lineart">Line art</option>
+              <option value="synthwave">Synthwave neon</option>
+              <option value="folktale">African folktale</option>
+            </select>
+          </div>
+          <button class="btn primary" id="genScenes" style="width:100%;justify-content:center;"><Icon name="robot" size={16} />Generate scenes</button>
+          <div id="sceneProg" class="hint" style="margin-top:8px;text-align:center;display:none;">Generating scene 1</div>
+          <p class="hint" style="margin-top:8px;">Each line becomes an image on the timeline. Add a voiceover, then press Auto fit to sync them.</p>
+        </div>
+      </div>
+
+      <!-- Selected clip -->
+      <div class="card" id="clipPanel">
+        <div class="card-head"><div><h3>Selected clip</h3><p id="clipHint">Pick a clip on the timeline</p></div></div>
+        <div class="card-body">
+          <div class="field">
+            <label>Transition in</label>
+            <select class="select" id="transSel" disabled>
+              <option value="none">Hard cut</option>
+              <option value="crossfade">Crossfade</option>
+              <option value="fade">Fade through black</option>
+              <option value="slide">Slide in</option>
+              <option value="zoom">Zoom (Ken Burns)</option>
+            </select>
+          </div>
+          <div class="field" id="durField">
+            <label>Duration <span class="faint" id="durVal">3.0s</span></label>
+            <input class="range" id="durRange" type="range" min="1" max="12" step="0.5" value="3" disabled />
+          </div>
+          <div id="trimField" style="display:none;">
+            <div class="field">
+              <label>Trim start <span class="faint" id="trimStartVal">0.0s</span></label>
+              <input class="range" id="trimStart" type="range" min="0" max="10" step="0.1" value="0" />
+            </div>
+            <div class="field">
+              <label>Trim end <span class="faint" id="trimEndVal">5.0s</span></label>
+              <input class="range" id="trimEnd" type="range" min="0" max="10" step="0.1" value="5" />
+            </div>
+            <p class="hint" style="margin-top:0;">Clip length <span id="clipLen" style="color:var(--violet2);font-weight:700;">5.0s</span>. Drag the handles to keep only the part you want.</p>
+          </div>
+          <button class="btn sm" id="applyAll" disabled style="width:100%;justify-content:center;margin-top:6px;"><Icon name="swap" size={15} />Apply transition to all</button>
+        </div>
+      </div>
+
+      <!-- Audio align -->
+      <div class="card">
+        <div class="card-head"><div><h3>Audio alignment</h3><p>Keep visuals in step</p></div></div>
+        <div class="card-body">
+          <div class="flex between center" style="margin-bottom:12px;">
+            <div><div style="font-weight:600;font-size:13.5px;">Audio length</div><div class="faint" style="font-size:12px;" id="audioLen">No track loaded</div></div>
+            <span class="badge draft" id="alignState"><span class="d"></span>Manual</span>
+          </div>
+          <button class="btn primary sm" id="autoFit" style="width:100%;justify-content:center;"><Icon name="target" size={15} />Auto fit clips to audio</button>
+          <p class="hint" style="margin-top:10px;">This spreads your clips evenly across the audio so each visual lands with what is being said.</p>
+        </div>
+      </div>
+
+      <!-- Voiceover recorder -->
+      <div class="card">
+        <div class="card-head"><div><h3>Voiceover recorder</h3><p>Record narration with your mic</p></div></div>
+        <div class="card-body">
+          <button class="btn" id="recBtn" style="width:100%;justify-content:center;"><Icon name="mic" size={16} />Start recording</button>
+          <div id="recStatus" style="display:none;align-items:center;gap:10px;margin-top:14px;">
+            <span class="rec-dot"></span>
+            <span class="time" id="recTime" style="font-size:14px;">0:00</span>
+            <span class="faint" style="font-size:12px;">Recording your voiceover</span>
+          </div>
+          <p class="hint" style="margin-top:10px;">Your recording becomes the voiceover track and can auto fit your clips.</p>
+        </div>
+      </div>
+
+      <!-- Narration (keyless: natural neural voice or quick browser voice) -->
+      <div class="card">
+        <div class="card-head"><div><h3>Narration</h3><p>A natural voice, free and keyless</p></div></div>
+        <div class="card-body">
+          <div class="field"><label>Script</label><textarea class="textarea" id="ttsScript" style="min-height:80px;" placeholder="Paste your narration script here"></textarea></div>
+
+          <label style="display:block;font-size:12.5px;font-weight:700;color:var(--muted);margin-bottom:8px;">Natural voice, runs on your device</label>
+          <div class="field" style="margin-bottom:10px;">
+            <select class="select" id="nvVoice">
+              <option value="af_heart">Aria, warm US female</option>
+              <option value="am_michael">Michael, calm US male</option>
+              <option value="bm_george">George, UK documentary male</option>
+              <option value="bf_emma">Emma, UK female</option>
+              <option value="af_bella">Bella, US female</option>
+              <option value="am_adam">Adam, US male</option>
+            </select>
+          </div>
+          <button class="btn primary" id="nvGenerate" style="width:100%;justify-content:center;"><Icon name="sparkles" size={15} />Generate natural voiceover</button>
+
+          <div style="border-top:1px solid var(--border); margin:14px 0 12px;"></div>
+
+          <label style="display:block;font-size:12.5px;font-weight:700;color:var(--muted);margin-bottom:8px;">Quick browser voice</label>
+          <div class="grid g-2" style="gap:10px;">
+            <div class="field" style="margin-bottom:10px;"><select class="select" id="ttsVoice"></select></div>
+            <div class="field" style="margin-bottom:10px;"><select class="select" id="ttsRate"><option value="0.9">Calm</option><option value="1" selected>Normal</option><option value="1.15">Lively</option></select></div>
+          </div>
+          <button class="btn" id="ttsPreview" style="width:100%;justify-content:center;"><Icon name="play" size={15} />Preview browser voice</button>
+
+          <p class="hint" id="ttsHint" style="margin-top:10px;">The natural voice downloads once, then runs on your device with no key and bakes into the export. The browser voice is instant for checking timing.</p>
+        </div>
+      </div>
+
+      <!-- Background music -->
+      <div class="card">
+        <div class="card-head"><div><h3>Background music</h3><p>Mix a track under your audio</p></div></div>
+        <div class="card-body">
+          <button class="btn" id="uploadMusic" style="width:100%;justify-content:center;"><Icon name="music" size={16} />Add music</button>
+          <div id="musicControls" style="display:none;margin-top:14px;">
+            <div class="flex between center" style="margin-bottom:10px;">
+              <span style="font-weight:600;font-size:13px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:200px;" id="musicName">track.mp3</span>
+              <button class="btn sm ghost" id="removeMusic" style="color:var(--rose);">Remove</button>
+            </div>
+            <label style="font-size:12.5px;font-weight:700;color:var(--muted);">Music volume <span class="faint" id="musicVolVal">35%</span></label>
+            <input class="range" id="musicVol" type="range" min="0" max="100" value="35" style="margin-top:6px;" />
+          </div>
+          <p class="hint" style="margin-top:10px;">Music loops under your voiceover and is mixed into the export.</p>
+        </div>
+      </div>
+
+      <!-- On screen text -->
+      <div class="card">
+        <div class="card-head"><div><h3>On screen text</h3><p>Optional caption</p></div></div>
+        <div class="card-body">
+          <input class="input" id="capText" type="text" placeholder="For example, Chapter one" />
+          <p class="hint" style="margin-top:8px;">Shows as a lower caption across the whole video.</p>
+        </div>
+      </div>
+
+      <!-- Export -->
+      <div class="card">
+        <div class="card-head"><div><h3>Export</h3><p>Render to a video file</p></div></div>
+        <div class="card-body">
+          <label style="display:block;font-size:12.5px;font-weight:700;color:var(--muted);margin-bottom:8px;">Format</label>
+          <div class="seg" id="formatSeg" style="margin-bottom:14px;">
+            <button data-fmt="mp4" class="on">MP4</button>
+            <button data-fmt="webm">WebM</button>
+          </div>
+          <div class="flex between" style="font-size:12.5px;margin-bottom:12px;">
+            <span class="muted">Resolution</span><span style="font-weight:700;">1280 by 720</span>
+          </div>
+          <button class="btn primary" id="exportBtn" style="width:100%;justify-content:center;"><Icon name="download" size={16} />Export video</button>
+          <div id="exportProg" style="display:none;margin-top:12px;">
+            <div class="bar"><span id="exportFill" style="width:0%"></span></div>
+            <p class="hint" style="margin-top:6px;text-align:center;" id="exportLabel">Recording your sequence</p>
+          </div>
+          <div id="renderHistory" style="margin-top:12px;"></div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <audio id="audioEl" style="display:none;"></audio>
+  <audio id="musicEl" loop style="display:none;"></audio>
+  <input type="file" id="imgInput" accept="image/*" multiple style="display:none;" />
+  <input type="file" id="vidInput" accept="video/*" multiple style="display:none;" />
+  <input type="file" id="audInput" accept="audio/*" style="display:none;" />
+  <input type="file" id="musInput" accept="audio/*" style="display:none;" />
+
+  <script is:inline>
+  (function () {
+    const canvas = document.getElementById("stage");
+    const ctx = canvas.getContext("2d");
+    const W = canvas.width, H = canvas.height;
+    const TR = 0.6; // transition length in seconds
+
+    const palettes = [
+      ["#ff2d55", "#7c5cff"], ["#22d3ee", "#7c5cff"], ["#34d399", "#22d3ee"],
+      ["#fbbf24", "#ff2d55"], ["#7c5cff", "#ff5e7d"], ["#22d3ee", "#34d399"]
+    ];
+
+    // Seed sample sequence so the studio works instantly
+    let clips = [
+      { emoji: "🎬", c: palettes[0], duration: 3, transition: "fade", img: null },
+      { emoji: "🚀", c: palettes[1], duration: 3, transition: "crossfade", img: null },
+      { emoji: "💡", c: palettes[2], duration: 3, transition: "slide", img: null },
+      { emoji: "🎯", c: palettes[3], duration: 3, transition: "zoom", img: null }
+    ];
+    let selected = 0;
+    let audio = null; // { duration }
+    const audioEl = document.getElementById("audioEl");
+    let caption = "";
+    let exportFormat = "mp4";
+    let isLive = false;      // true while previewing or exporting
+    let activeVid = null;    // the video element currently on screen
+    const musicEl = document.getElementById("musicEl");
+    let music = null;        // { name } when a music track is loaded
+    let musicVol = 0.35;
+
+    // Keep the current video clip playing or seeked to the right spot
+    function manageVideo(clip, lt) {
+      if (clip.type === "video" && clip.el) {
+        const v = clip.el;
+        if (activeVid && activeVid !== v) activeVid.pause();
+        activeVid = v;
+        const off = clip.trimStart || 0;
+        if (isLive) {
+          if (v.paused) { try { v.currentTime = off + Math.min(lt, clip.duration); } catch (e) {} v.play().catch(() => {}); }
+        } else {
+          if (!v.paused) v.pause();
+          try { v.currentTime = off + Math.min(lt, clip.duration); } catch (e) {}
+        }
+      } else if (activeVid) {
+        activeVid.pause(); activeVid = null;
+      }
+    }
+
+    const fmt = (s) => {
+      s = Math.max(0, s);
+      const m = Math.floor(s / 60);
+      const ss = Math.floor(s % 60);
+      return m + ":" + (ss < 10 ? "0" : "") + ss;
+    };
+    const totalDur = () => clips.reduce((a, c) => a + c.duration, 0);
+
+    function coverDraw(media, mw, mh, scale, offsetX) {
+      const ir = mw / mh, cr = W / H;
+      let dw, dh;
+      if (ir > cr) { dh = H * scale; dw = dh * ir; } else { dw = W * scale; dh = dw / ir; }
+      ctx.drawImage(media, (W - dw) / 2 + offsetX, (H - dh) / 2, dw, dh);
+    }
+
+    function drawContent(clip, alpha, scale, offsetX) {
+      ctx.save();
+      ctx.globalAlpha = alpha;
+      if (clip.type === "video" && clip.el && clip.el.readyState >= 2) {
+        coverDraw(clip.el, clip.el.videoWidth || 1280, clip.el.videoHeight || 720, scale, offsetX);
+      } else if (clip.img) {
+        coverDraw(clip.img, clip.img.width, clip.img.height, scale, offsetX);
+      } else {
+        const g = ctx.createLinearGradient(0, 0, W, H);
+        g.addColorStop(0, clip.c[0]); g.addColorStop(1, clip.c[1]);
+        ctx.fillStyle = g;
+        ctx.fillRect(offsetX, 0, W, H);
+        ctx.globalAlpha = alpha * 0.9;
+        ctx.font = (260 * scale) + "px serif";
+        ctx.textAlign = "center"; ctx.textBaseline = "middle";
+        ctx.fillText(clip.emoji, W / 2 + offsetX, H / 2);
+      }
+      ctx.restore();
+    }
+
+    function drawCaption() {
+      if (!caption) return;
+      ctx.save();
+      ctx.textAlign = "center"; ctx.textBaseline = "middle";
+      ctx.font = "700 52px Inter, sans-serif";
+      const tw = ctx.measureText(caption).width;
+      const bw = tw + 60, bh = 78, bx = (W - bw) / 2, by = H - 130;
+      ctx.fillStyle = "rgba(10,11,18,.72)";
+      ctx.beginPath();
+      const r = 16;
+      ctx.moveTo(bx + r, by); ctx.arcTo(bx + bw, by, bx + bw, by + bh, r);
+      ctx.arcTo(bx + bw, by + bh, bx, by + bh, r); ctx.arcTo(bx, by + bh, bx, by, r);
+      ctx.arcTo(bx, by, bx + bw, by, r); ctx.fill();
+      ctx.fillStyle = "#ffffff";
+      ctx.fillText(caption, W / 2, by + bh / 2 + 2);
+      ctx.restore();
+    }
+
+    function draw(t) {
+      ctx.clearRect(0, 0, W, H);
+      ctx.fillStyle = "#05060a"; ctx.fillRect(0, 0, W, H);
+
+      if (!clips.length) {
+        ctx.fillStyle = "#6b7299"; ctx.font = "600 34px Inter, sans-serif";
+        ctx.textAlign = "center"; ctx.textBaseline = "middle";
+        ctx.fillText("Add clips to begin", W / 2, H / 2);
+        return;
+      }
+
+      // find current clip
+      let acc = 0, i = 0, lt = 0;
+      for (i = 0; i < clips.length; i++) {
+        if (t < acc + clips[i].duration || i === clips.length - 1) { lt = t - acc; break; }
+        acc += clips[i].duration;
+      }
+      if (i >= clips.length) i = clips.length - 1;
+      const clip = clips[i];
+      lt = Math.max(0, Math.min(lt, clip.duration));
+      manageVideo(clip, lt);
+      const prev = clips[i - 1] || null;
+      const eff = clip.transition;
+      const inTrans = lt < TR && TR > 0;
+      const p = Math.min(1, lt / TR);
+      let scale = 1;
+      if (eff === "zoom") scale = 1 + 0.1 * (lt / clip.duration);
+
+      if (eff === "crossfade" && inTrans) {
+        if (prev) drawContent(prev, 1, 1, 0); else { ctx.fillStyle = "#05060a"; ctx.fillRect(0, 0, W, H); }
+        drawContent(clip, p, 1, 0);
+      } else if (eff === "slide" && inTrans) {
+        if (prev) drawContent(prev, 1, 1, 0);
+        drawContent(clip, 1, 1, (1 - p) * W);
+      } else if (eff === "fade" && inTrans) {
+        drawContent(clip, 1, scale, 0);
+        ctx.save(); ctx.globalAlpha = 1 - p; ctx.fillStyle = "#000"; ctx.fillRect(0, 0, W, H); ctx.restore();
+      } else {
+        drawContent(clip, 1, scale, 0);
+      }
+      drawCaption();
+    }
+
+    // ---------- timeline rendering ----------
+    const track = document.getElementById("clipTrack");
+    const addBtn = document.getElementById("addClipBtn");
+    function renderTrack() {
+      track.querySelectorAll(".clip").forEach((n) => n.remove());
+      clips.forEach((c, idx) => {
+        const el = document.createElement("div");
+        el.className = "clip" + (idx === selected ? " sel" : "");
+        el.setAttribute("data-i", idx);
+        let bg;
+        if (c.type === "video") bg = c.thumbUrl ? `<img src="${c.thumbUrl}" alt="">` : `<div class="big" style="background:linear-gradient(135deg,#222741,#1a1e30);width:100%;height:100%;">🎬</div>`;
+        else if (c.img) bg = `<img src="${c.img.src}" alt="">`;
+        else bg = `<div class="big" style="background:linear-gradient(135deg,${c.c[0]},${c.c[1]});width:100%;height:100%;">${c.emoji}</div>`;
+        el.innerHTML =
+          bg +
+          `<span class="trans">${c.transition === "none" ? "cut" : c.transition}</span>` +
+          `<span class="dur">${c.duration.toFixed(1)}s</span>` +
+          `<button class="rm" data-rm="${idx}"><svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><path d="M5 5l14 14M19 5L5 19"/></svg></button>`;
+        track.insertBefore(el, addBtn);
+      });
+      document.getElementById("totTime").textContent = fmt(totalDur());
+      syncClipPanel();
+    }
+
+    function syncClipPanel() {
+      const c = clips[selected];
+      const ts = document.getElementById("transSel");
+      const dr = document.getElementById("durRange");
+      const aa = document.getElementById("applyAll");
+      const durField = document.getElementById("durField");
+      const trimField = document.getElementById("trimField");
+      if (!c) {
+        ts.disabled = dr.disabled = aa.disabled = true;
+        durField.style.display = ""; trimField.style.display = "none";
+        document.getElementById("clipHint").textContent = "Pick a clip on the timeline";
+        return;
+      }
+      ts.disabled = aa.disabled = false;
+      ts.value = c.transition;
+      document.getElementById("clipHint").textContent = "Clip " + (selected + 1) + " of " + clips.length;
+
+      if (c.type === "video") {
+        // trimming controls for video clips
+        durField.style.display = "none";
+        trimField.style.display = "";
+        const src = c.srcDur || c.duration;
+        const ts0 = document.getElementById("trimStart");
+        const te0 = document.getElementById("trimEnd");
+        ts0.max = src.toFixed(1); te0.max = src.toFixed(1);
+        ts0.value = (c.trimStart || 0);
+        te0.value = (c.trimEnd != null ? c.trimEnd : c.duration);
+        document.getElementById("trimStartVal").textContent = Number(ts0.value).toFixed(1) + "s";
+        document.getElementById("trimEndVal").textContent = Number(te0.value).toFixed(1) + "s";
+        document.getElementById("clipLen").textContent = c.duration.toFixed(1) + "s";
+      } else {
+        durField.style.display = "";
+        trimField.style.display = "none";
+        dr.disabled = false;
+        dr.value = c.duration;
+        document.getElementById("durVal").textContent = c.duration.toFixed(1) + "s";
+      }
+    }
+
+    // start time of a clip on the timeline
+    function clipStart(idx) {
+      let s = 0;
+      for (let i = 0; i < idx; i++) s += clips[i].duration;
+      return s;
+    }
+
+    track.addEventListener("click", (e) => {
+      const rm = e.target.closest("[data-rm]");
+      if (rm) {
+        const idx = parseInt(rm.getAttribute("data-rm"), 10);
+        clips.splice(idx, 1);
+        if (selected >= clips.length) selected = clips.length - 1;
+        renderTrack(); draw(0); setPlayhead(0);
+        return;
+      }
+      const clip = e.target.closest(".clip");
+      if (clip) { selected = parseInt(clip.getAttribute("data-i"), 10); renderTrack(); }
+    });
+
+    document.getElementById("transSel").addEventListener("change", (e) => {
+      if (clips[selected]) { clips[selected].transition = e.target.value; renderTrack(); draw(0); setPlayhead(0); }
+    });
+    document.getElementById("durRange").addEventListener("input", (e) => {
+      if (clips[selected]) {
+        clips[selected].duration = parseFloat(e.target.value);
+        document.getElementById("durVal").textContent = clips[selected].duration.toFixed(1) + "s";
+        renderTrack();
+      }
+    });
+    document.getElementById("applyAll").addEventListener("click", () => {
+      const tval = clips[selected].transition;
+      clips.forEach((c) => c.transition = tval);
+      renderTrack(); window.showToast("Transition applied to all clips");
+    });
+
+    // per clip trimming (video clips)
+    function applyTrim(previewAtEnd) {
+      const c = clips[selected];
+      if (!c || c.type !== "video") return;
+      let s = parseFloat(document.getElementById("trimStart").value);
+      let e = parseFloat(document.getElementById("trimEnd").value);
+      const src = c.srcDur || c.duration;
+      s = Math.max(0, Math.min(s, src - 0.5));
+      e = Math.min(src, Math.max(e, s + 0.5));
+      c.trimStart = s; c.trimEnd = e; c.duration = Math.round((e - s) * 10) / 10;
+      document.getElementById("trimStart").value = s;
+      document.getElementById("trimEnd").value = e;
+      document.getElementById("trimStartVal").textContent = s.toFixed(1) + "s";
+      document.getElementById("trimEndVal").textContent = e.toFixed(1) + "s";
+      document.getElementById("clipLen").textContent = c.duration.toFixed(1) + "s";
+      renderTrack();
+      // preview the trimmed frame on the stage
+      const base = clipStart(selected);
+      const at = previewAtEnd ? base + c.duration - 0.05 : base;
+      setPlayhead(at); draw(at);
+    }
+    document.getElementById("trimStart").addEventListener("input", () => applyTrim(false));
+    document.getElementById("trimEnd").addEventListener("input", () => applyTrim(true));
+
+    // ---------- uploads ----------
+    const imgInput = document.getElementById("imgInput");
+    const vidInput = document.getElementById("vidInput");
+    const audInput = document.getElementById("audInput");
+    const musInput = document.getElementById("musInput");
+    document.getElementById("uploadImg").addEventListener("click", () => imgInput.click());
+    document.getElementById("addClipBtn").addEventListener("click", () => imgInput.click());
+    document.getElementById("uploadVideo").addEventListener("click", () => vidInput.click());
+    document.getElementById("uploadAudio").addEventListener("click", () => audInput.click());
+    document.getElementById("uploadMusic").addEventListener("click", () => musInput.click());
+
+    // add one or many video clips
+    function addVideoClip(file, k) {
+      const v = document.createElement("video");
+      v.src = URL.createObjectURL(file);
+      v.muted = true; v.playsInline = true; v.preload = "auto";
+      v.addEventListener("loadeddata", () => {
+        const srcDur = (isFinite(v.duration) && v.duration > 0.2) ? v.duration : 8;
+        const end = Math.min(srcDur, 12);
+        const clip = { type: "video", el: v, srcDur: srcDur, trimStart: 0, trimEnd: Math.round(end * 10) / 10, duration: Math.round(end * 10) / 10, transition: "crossfade", thumbUrl: null, name: file.name };
+        clips.push(clip);
+        selected = clips.length - 1;
+        renderTrack(); draw(0); setPlayhead(0);
+        // capture a poster frame for the timeline
+        const onSeek = () => {
+          try {
+            const cnv = document.createElement("canvas"); cnv.width = 216; cnv.height = 120;
+            cnv.getContext("2d").drawImage(v, 0, 0, 216, 120);
+            clip.thumbUrl = cnv.toDataURL("image/jpeg", 0.7);
+            renderTrack();
+          } catch (e) {}
+          v.removeEventListener("seeked", onSeek);
+        };
+        v.addEventListener("seeked", onSeek);
+        try { v.currentTime = Math.min(0.1, srcDur); } catch (e) {}
+      }, { once: true });
+    }
+
+    vidInput.addEventListener("change", () => {
+      const files = Array.from(vidInput.files);
+      files.forEach((f, k) => addVideoClip(f, k));
+      if (files.length) window.showToast(files.length + " video clip(s) added");
+      vidInput.value = "";
+    });
+
+    // background music
+    musInput.addEventListener("change", () => {
+      const f = musInput.files[0]; if (!f) return;
+      musicEl.src = URL.createObjectURL(f); musicEl.load();
+      music = { name: f.name };
+      musicEl.volume = musicVol;
+      document.getElementById("musicName").textContent = f.name;
+      document.getElementById("musicControls").style.display = "block";
+      window.showToast("Background music added");
+      musInput.value = "";
+    });
+    document.getElementById("musicVol").addEventListener("input", (e) => {
+      musicVol = e.target.value / 100;
+      document.getElementById("musicVolVal").textContent = e.target.value + "%";
+      musicEl.volume = musicVol;
+      if (musicGain) musicGain.gain.value = musicVol;
+    });
+    document.getElementById("removeMusic").addEventListener("click", () => {
+      music = null; musicEl.pause(); musicEl.removeAttribute("src");
+      document.getElementById("musicControls").style.display = "none";
+      window.showToast("Music removed");
+    });
+
+    imgInput.addEventListener("change", () => {
+      const files = Array.from(imgInput.files);
+      let pending = files.length;
+      files.forEach((f, k) => {
+        const img = new Image();
+        img.onload = () => {
+          clips.push({ img: img, c: palettes[k % palettes.length], duration: 3, transition: "crossfade", emoji: "🖼️" });
+          if (--pending === 0) { selected = clips.length - 1; renderTrack(); draw(0); setPlayhead(0); window.showToast(files.length + " image(s) added"); }
+        };
+        img.src = URL.createObjectURL(f);
+      });
+      imgInput.value = "";
+    });
+
+    // shared voiceover loader used by upload and recorder
+    function loadVoiceover(url, blob, toastMsg) {
+      audioEl.src = url;
+      audioEl.load();
+      audioEl.onloadedmetadata = () => {
+        audio = { duration: audioEl.duration };
+        document.getElementById("audioEmpty").style.display = "none";
+        document.getElementById("wave").style.display = "flex";
+        document.getElementById("audioLen").textContent = fmt(audioEl.duration) + " long";
+        document.getElementById("autoFit").disabled = false;
+        window.showToast(toastMsg || "Voiceover added");
+      };
+      if (blob) buildWaveform(blob);
+    }
+
+    audInput.addEventListener("change", () => {
+      const f = audInput.files[0];
+      if (!f) return;
+      loadVoiceover(URL.createObjectURL(f), f, "Voiceover added");
+      audInput.value = "";
+    });
+
+    // ---------- voiceover recorder ----------
+    let mediaRec = null, recChunks = [], recording = false, recTimer = null, recStart = 0, recStream = null;
+    const recBtn = document.getElementById("recBtn");
+    const recStatus = document.getElementById("recStatus");
+
+    function tickRec() {
+      const el = performance.now() - recStart;
+      const s = Math.floor(el / 1000);
+      document.getElementById("recTime").textContent = fmt(s);
+    }
+
+    recBtn.addEventListener("click", async () => {
+      if (recording) {
+        try { mediaRec.stop(); } catch (e) {}
+        return;
+      }
+      if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+        window.showToast("Recording is not supported in this browser");
+        return;
+      }
+      try {
+        recStream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      } catch (e) {
+        window.showToast("Microphone permission was declined");
+        return;
+      }
+      recChunks = [];
+      let rmime = "audio/webm";
+      if (!MediaRecorder.isTypeSupported(rmime)) rmime = "";
+      mediaRec = rmime ? new MediaRecorder(recStream, { mimeType: rmime }) : new MediaRecorder(recStream);
+      mediaRec.ondataavailable = (e) => { if (e.data.size) recChunks.push(e.data); };
+      mediaRec.onstop = () => {
+        recording = false;
+        clearInterval(recTimer);
+        recBtn.innerHTML = '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="2" width="6" height="12" rx="3"/><path d="M5 10a7 7 0 0 0 14 0M12 19v3"/></svg> Start recording';
+        recBtn.classList.remove("primary");
+        recStatus.style.display = "none";
+        if (recStream) recStream.getTracks().forEach((t) => t.stop());
+        const blob = new Blob(recChunks, { type: "audio/webm" });
+        loadVoiceover(URL.createObjectURL(blob), blob, "Voiceover recorded");
+      };
+      mediaRec.start();
+      recording = true;
+      recStart = performance.now();
+      recBtn.innerHTML = '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><rect x="6" y="6" width="12" height="12" rx="2"/></svg> Stop recording';
+      recBtn.classList.add("primary");
+      recStatus.style.display = "flex";
+      document.getElementById("recTime").textContent = "0:00";
+      recTimer = setInterval(tickRec, 250);
+    });
+
+    async function buildWaveform(file) {
+      try {
+        const ac = new (window.AudioContext || window.webkitAudioContext)();
+        const buf = await ac.decodeAudioData(await file.arrayBuffer());
+        const data = buf.getChannelData(0);
+        const bars = 130, block = Math.floor(data.length / bars);
+        const wave = document.getElementById("wave");
+        wave.innerHTML = "";
+        for (let b = 0; b < bars; b++) {
+          let sum = 0;
+          for (let j = 0; j < block; j++) sum += Math.abs(data[b * block + j] || 0);
+          const amp = Math.min(1, (sum / block) * 3.2);
+          const bar = document.createElement("div");
+          bar.className = "b";
+          bar.style.height = Math.max(3, amp * 40) + "px";
+          wave.appendChild(bar);
+        }
+        ac.close();
+      } catch (e) { /* decoding not supported, keep placeholder */ }
+    }
+
+    document.getElementById("autoFit").addEventListener("click", () => {
+      if (!clips.length) { window.showToast("Add some clips first"); return; }
+      if (!audio) { window.showToast("Add a voiceover or narration first, then auto fit"); return; }
+      const each = Math.round((audio.duration / clips.length) * 2) / 2;
+      clips.forEach((c) => c.duration = Math.max(1, each));
+      renderTrack(); draw(0); setPlayhead(0);
+      document.getElementById("alignState").className = "badge published";
+      document.getElementById("alignState").innerHTML = '<span class="d"></span>Aligned';
+      window.showToast("Clips aligned to your audio");
+    });
+
+    document.getElementById("capText").addEventListener("input", (e) => { caption = e.target.value; draw(curT); });
+
+    document.getElementById("formatSeg").addEventListener("click", (e) => {
+      const b = e.target.closest("button"); if (!b) return;
+      document.querySelectorAll("#formatSeg button").forEach((n) => n.classList.remove("on"));
+      b.classList.add("on"); exportFormat = b.getAttribute("data-fmt");
+    });
+
+    // ---------- AI scene generator ----------
+    const styleKW = {
+      watercolor: "storybook illustration, clean bold ink outlines, flat soft watercolor fills, warm vivid palette, gentle cel shading, cream paper background with loose watercolor edges, editorial childrens book art, crisp and detailed, not photorealistic",
+      cinematic: "cinematic photograph, dramatic lighting, film still, highly detailed, 35mm",
+      storybook: "storybook painting, warm, painterly, whimsical",
+      anime: "anime style, cel shaded, vibrant, detailed background",
+      "3d": "3d render, soft studio lighting, subsurface scattering, pixar style",
+      flat: "flat vector illustration, minimal, bold shapes, clean",
+      oil: "oil painting, rich impasto brushstrokes, classical, textured canvas, warm light",
+      pencil: "detailed pencil sketch, graphite shading, cross hatching, monochrome, hand drawn",
+      comic: "comic book illustration, bold ink outlines, halftone dots, dynamic, vibrant colors",
+      papercut: "layered paper cut art, soft drop shadows, tactile, handcrafted, clean edges",
+      fantasy: "epic fantasy concept art, luminous atmosphere, highly detailed digital painting",
+      vintage: "vintage photograph, faded film grain, nostalgic, sepia and muted tones",
+      pixel: "pixel art, 16 bit retro game style, crisp pixels, limited palette",
+      claymation: "claymation, plasticine clay model, stop motion, soft studio light",
+      lineart: "elegant line art, minimal single weight lines, clean white background",
+      synthwave: "synthwave retro futuristic, neon glow, purple and cyan, 1980s aesthetic",
+      folktale: "African folktale illustration, rich earth tones, bold tribal patterns, Ndebele and Kente inspired motifs, warm ochre and indigo palette, textured, storytelling art"
+    };
+    function loadSceneImage(prompt, style, seed) {
+      return new Promise((resolve) => {
+        const full = prompt + ", " + (styleKW[style] || "");
+        const url = "/ai-image/" + encodeURIComponent(full) + "?width=1280&height=720&nologo=true&model=flux&seed=" + seed;
+        const img = new Image();
+        img.onload = () => resolve(img);
+        img.onerror = () => resolve(null);
+        img.src = url;
+      });
+    }
+    // Retry a few times so an occasional image hiccup does not drop a scene
+    async function generateScene(prompt, style, seed) {
+      let img = null;
+      for (let attempt = 0; attempt < 3 && !img; attempt++) {
+        img = await loadSceneImage(prompt, style, seed + attempt * 1000);
+        if (!img && attempt < 2) await new Promise((r) => setTimeout(r, 1500));
+      }
+      if (!img) return false;
+      clips.push({ img: img, c: palettes[clips.length % palettes.length], duration: 4, transition: "crossfade", emoji: "🖼️" });
+      return true;
+    }
+    document.getElementById("genScenes").addEventListener("click", async () => {
+      const lines = (document.getElementById("scenePrompts").value || "").split("\n").map((s) => s.trim()).filter(Boolean);
+      if (!lines.length) { window.showToast("Add at least one scene prompt"); return; }
+      const style = document.getElementById("sceneStyle").value;
+      const btn = document.getElementById("genScenes");
+      const prog = document.getElementById("sceneProg");
+      btn.disabled = true; prog.style.display = "block";
+      const baseSeed = 1000 + lines.length;
+      let ok = 0;
+      for (let i = 0; i < lines.length; i++) {
+        prog.textContent = "Generating scene " + (i + 1) + " of " + lines.length;
+        const success = await generateScene(lines[i], style, baseSeed + i * 7);
+        if (success) { ok++; selected = clips.length - 1; renderTrack(); draw(0); setPlayhead(0); }
+      }
+      btn.disabled = false; prog.style.display = "none";
+      window.showToast(ok ? (ok + " scene(s) added to the timeline") : "The image model was unreachable");
+    });
+
+    // ---------- story builder (script splitter) ----------
+    function splitScript(text) {
+      text = text.trim().replace(/[ \t]+/g, " ");
+      let parts = text.split(/\n\s*\n/).map((s) => s.trim().replace(/\n/g, " ")).filter(Boolean);
+      if (parts.length < 2) {
+        const sentences = text.replace(/\n/g, " ").match(/[^.!?]+[.!?]+/g);
+        if (sentences && sentences.length > 1) parts = sentences.map((s) => s.trim()).filter(Boolean);
+      }
+      const MAX = 12;
+      if (parts.length > MAX) {
+        const grouped = [], per = Math.ceil(parts.length / MAX);
+        for (let i = 0; i < parts.length; i += per) grouped.push(parts.slice(i, i + per).join(" "));
+        parts = grouped;
+      }
+      return parts;
+    }
+
+    document.getElementById("buildStory").addEventListener("click", async () => {
+      const text = (document.getElementById("storyScript").value || "").trim();
+      if (!text) { window.showToast("Paste a script first"); return; }
+      const scenes = splitScript(text);
+      const style = document.getElementById("storyStyle").value;
+      const btn = document.getElementById("buildStory");
+      const prog = document.getElementById("storyProg");
+
+      // load the full script into the narration box for the voiceover
+      document.getElementById("ttsScript").value = text;
+      // start a clean story: drop the sample placeholder clips, keep any real media
+      clips = clips.filter((c) => c.img || c.type === "video");
+
+      btn.disabled = true; prog.style.display = "block";
+      const transitions = ["zoom", "crossfade"];
+      let ok = 0;
+      for (let i = 0; i < scenes.length; i++) {
+        prog.textContent = "Building scene " + (i + 1) + " of " + scenes.length;
+        const success = await generateScene(scenes[i], style, 2000 + i * 7);
+        if (success) {
+          ok++;
+          const clip = clips[clips.length - 1];
+          clip.transition = transitions[i % 2];
+          clip.duration = 4;
+          selected = clips.length - 1; renderTrack(); draw(0); setPlayhead(0);
+        }
+      }
+      btn.disabled = false; prog.style.display = "none";
+      window.showToast(ok ? (ok + " scenes built. Add narration, then press Auto fit.") : "The image model was unreachable");
+    });
+
+    // ---------- narration (text to speech) ----------
+    let ttsVoiceList = [];
+    const ttsVoiceSel = document.getElementById("ttsVoice");
+    function populateVoices() {
+      if (!("speechSynthesis" in window)) { ttsVoiceSel.innerHTML = "<option>Browser voice</option>"; return; }
+      const voices = speechSynthesis.getVoices();
+      const en = voices.filter((v) => /en/i.test(v.lang));
+      ttsVoiceList = en.length ? en : voices;
+      ttsVoiceSel.innerHTML = ttsVoiceList.map((v, i) => '<option value="' + i + '">' + v.name.replace(/\(.*\)/, "").trim() + "</option>").join("") || "<option>Default</option>";
+    }
+    populateVoices();
+    if ("speechSynthesis" in window) speechSynthesis.onvoiceschanged = populateVoices;
+
+    document.getElementById("ttsPreview").addEventListener("click", () => {
+      const script = (document.getElementById("ttsScript").value || "").trim();
+      if (!script) { window.showToast("Add a script first"); return; }
+      if (!("speechSynthesis" in window)) { window.showToast("This browser has no speech voice"); return; }
+      speechSynthesis.cancel();
+      const u = new SpeechSynthesisUtterance(script);
+      const idx = parseInt(document.getElementById("ttsVoice").value, 10);
+      if (ttsVoiceList[idx]) u.voice = ttsVoiceList[idx];
+      u.rate = parseFloat(document.getElementById("ttsRate").value) || 1;
+      speechSynthesis.speak(u);
+      window.showToast("Playing narration preview");
+    });
+
+    // Natural neural voice, free and offline, baked into the export
+    document.getElementById("nvGenerate").addEventListener("click", async () => {
+      const script = (document.getElementById("ttsScript").value || "").trim();
+      const hint = document.getElementById("ttsHint");
+      const btn = document.getElementById("nvGenerate");
+      if (!script) { window.showToast("Add a script first"); return; }
+      btn.disabled = true;
+      hint.textContent = "Preparing the natural voice, a one time download";
+      try {
+        const mod = await import("/natural-voice.js");
+        const voice = document.getElementById("nvVoice").value;
+        const blob = await mod.synthesize(script, voice, (p) => { hint.textContent = p < 100 ? ("Downloading the voice model " + p + "%") : "Generating the narration"; });
+        loadVoiceover(URL.createObjectURL(blob), blob, "Natural narration added");
+        hint.textContent = "Natural narration is now the voiceover and will be in the export. Press Auto fit to sync the scenes.";
+      } catch (e) {
+        hint.textContent = "The natural voice could not load. Use the browser voice, or record a voiceover.";
+        window.showToast("Natural voice unavailable");
+      }
+      btn.disabled = false;
+    });
+
+    // Prefill the Story builder from the Guide page
+    (function () {
+      try {
+        const pre = localStorage.getItem("cf-prefill-script");
+        if (pre) {
+          localStorage.removeItem("cf-prefill-script");
+          const box = document.getElementById("storyScript");
+          if (box) { box.value = pre; document.getElementById("ttsScript").value = pre; window.showToast("Script loaded into the Story builder"); box.scrollIntoView({ block: "center" }); }
+        }
+      } catch (e) {}
+    })();
+
+    // ---------- playback ----------
+    let playing = false, rafId = null, startStamp = 0, seekOffset = 0, curT = 0;
+    const playBtn = document.getElementById("playBtn");
+    const scrubFill = document.getElementById("scrubFill");
+
+    function setPlayhead(t) {
+      curT = t;
+      const total = totalDur() || 1;
+      scrubFill.style.width = Math.min(100, (t / total) * 100) + "%";
+      document.getElementById("curTime").textContent = fmt(t);
+    }
+
+    function loop(now) {
+      const t = seekOffset + (now - startStamp) / 1000;
+      const total = totalDur();
+      if (t >= total) { draw(total); setPlayhead(total); stop(); return; }
+      draw(t); setPlayhead(t);
+      rafId = requestAnimationFrame(loop);
+    }
+
+    function play() {
+      if (!clips.length) return;
+      if (curT >= totalDur()) { seekOffset = 0; } else { seekOffset = curT; }
+      playing = true; isLive = true;
+      playBtn.innerHTML = '<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round"><path d="M8 5v14M16 5v14"/></svg>';
+      if (audio) { try { audioEl.currentTime = seekOffset; audioEl.play(); } catch (e) {} }
+      if (music) { try { musicEl.volume = musicVol; musicEl.play(); } catch (e) {} }
+      startStamp = performance.now();
+      rafId = requestAnimationFrame(loop);
+    }
+    function stop() {
+      playing = false; isLive = false;
+      cancelAnimationFrame(rafId);
+      playBtn.innerHTML = '<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round"><path d="M6 4l14 8-14 8z"/></svg>';
+      if (audio) audioEl.pause();
+      if (music) musicEl.pause();
+      if (activeVid) activeVid.pause();
+    }
+    playBtn.addEventListener("click", () => { playing ? stop() : play(); });
+
+    document.getElementById("scrub").addEventListener("click", (e) => {
+      const rect = e.currentTarget.getBoundingClientRect();
+      const frac = (e.clientX - rect.left) / rect.width;
+      const t = frac * totalDur();
+      stop(); setPlayhead(t); draw(t);
+    });
+
+    // ---------- export (real recording) ----------
+    let audioGraph = null, voiceSrc = null, musicSrc = null, musicGain = null;
+    function ensureAudioGraph() {
+      if (!audio && !music) return null;
+      if (!audioGraph) {
+        const ac = new (window.AudioContext || window.webkitAudioContext)();
+        const dest = ac.createMediaStreamDestination();
+        audioGraph = { ac, dest };
+      }
+      const ac = audioGraph.ac, dest = audioGraph.dest;
+      if (audio && !voiceSrc) {
+        voiceSrc = ac.createMediaElementSource(audioEl);
+        voiceSrc.connect(dest); voiceSrc.connect(ac.destination);
+      }
+      if (music && !musicSrc) {
+        musicSrc = ac.createMediaElementSource(musicEl);
+        musicGain = ac.createGain(); musicGain.gain.value = musicVol;
+        musicSrc.connect(musicGain); musicGain.connect(dest); musicGain.connect(ac.destination);
+      }
+      return audioGraph;
+    }
+
+    document.getElementById("exportBtn").addEventListener("click", async () => {
+      if (!clips.length) { window.showToast("Add a clip first"); return; }
+      stop();
+      const total = totalDur();
+      const prog = document.getElementById("exportProg");
+      const fill = document.getElementById("exportFill");
+      const label = document.getElementById("exportLabel");
+      const btn = document.getElementById("exportBtn");
+      prog.style.display = "block"; btn.disabled = true; label.textContent = "Recording your sequence";
+
+      const fps = 30;
+      const vStream = canvas.captureStream(fps);
+      let tracks = vStream.getVideoTracks();
+      if (audio || music) {
+        const g = ensureAudioGraph();
+        if (g) {
+          if (g.ac.state === "suspended") await g.ac.resume();
+          tracks = tracks.concat(g.dest.stream.getAudioTracks());
+        }
+      }
+      const mixed = new MediaStream(tracks);
+
+      let mime = "", ext = "webm";
+      if (exportFormat === "mp4") {
+        const mp4a = "video/mp4;codecs=avc1.42E01E,mp4a.40.2";
+        if (MediaRecorder.isTypeSupported(mp4a)) { mime = mp4a; ext = "mp4"; }
+        else if (MediaRecorder.isTypeSupported("video/mp4")) { mime = "video/mp4"; ext = "mp4"; }
+      }
+      if (!mime) {
+        if (MediaRecorder.isTypeSupported("video/webm;codecs=vp9,opus")) mime = "video/webm;codecs=vp9,opus";
+        else if (MediaRecorder.isTypeSupported("video/webm;codecs=vp8,opus")) mime = "video/webm;codecs=vp8,opus";
+        else mime = "video/webm";
+        ext = "webm";
+        if (exportFormat === "mp4") window.showToast("MP4 is not supported in this browser, saving WebM");
+      }
+      const rec = new MediaRecorder(mixed, { mimeType: mime, videoBitsPerSecond: 6000000 });
+      const chunks = [];
+      rec.ondataavailable = (e) => { if (e.data.size) chunks.push(e.data); };
+      rec.onstop = () => {
+        const blob = new Blob(chunks, { type: ext === "mp4" ? "video/mp4" : "video/webm" });
+        const url = URL.createObjectURL(blob);
+        addRender(url, blob.size, ext);
+        prog.style.display = "none"; btn.disabled = false;
+        window.showToast(ext.toUpperCase() + " video ready to download");
+      };
+
+      // drive playback in real time while recording
+      rec.start();
+      seekOffset = 0; curT = 0; isLive = true;
+      if (audio) { try { audioEl.currentTime = 0; audioEl.play(); } catch (e) {} }
+      if (music) { try { musicEl.currentTime = 0; musicEl.volume = musicVol; musicEl.play(); } catch (e) {} }
+      const begin = performance.now();
+      let finished = false;
+      function finish() {
+        if (finished) return;
+        finished = true;
+        clearInterval(drv);
+        isLive = false;
+        draw(total);
+        if (audio) audioEl.pause();
+        if (music) musicEl.pause();
+        if (activeVid) activeVid.pause();
+        if (rec.state !== "inactive") rec.stop();
+      }
+      // a timer driver keeps advancing even when animation frames are throttled
+      const drv = setInterval(function () {
+        const t = (performance.now() - begin) / 1000;
+        if (t >= total) { finish(); return; }
+        draw(t); setPlayhead(t);
+        fill.style.width = Math.min(100, (t / total) * 100) + "%";
+      }, 1000 / fps);
+      // guaranteed stop so a file is always produced
+      setTimeout(finish, total * 1000 + 600);
+    });
+
+    let renderCount = 0;
+    function humanSize(b) {
+      if (b < 1024) return b + " B";
+      if (b < 1048576) return (b / 1024).toFixed(0) + " KB";
+      return (b / 1048576).toFixed(1) + " MB";
+    }
+    function addRender(url, size, ext) {
+      renderCount++;
+      ext = ext || "webm";
+      const box = document.getElementById("renderHistory");
+      const row = document.createElement("div");
+      row.className = "render-row";
+      row.innerHTML =
+        `<div class="ico green" style="width:34px;height:34px;border-radius:9px;flex-shrink:0;"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><rect x="2.5" y="4" width="19" height="16" rx="2.5"/><path d="M10 9l6 3-6 3z"/></svg></div>` +
+        `<div style="flex:1;min-width:0;"><div style="font-weight:600;font-size:13px;">export_${renderCount}.${ext}</div><div class="faint" style="font-size:11.5px;">${humanSize(size)} · 1280 by 720</div></div>` +
+        `<a class="btn sm primary" href="${url}" download="creatorflow_export_${renderCount}.${ext}">Save</a>`;
+      box.insertBefore(row, box.firstChild);
+    }
+
+    // init
+    renderTrack();
+    setPlayhead(0);
+    draw(0);
+  })();
+  </script>
+</Layout>

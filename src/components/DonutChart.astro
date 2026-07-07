@@ -1,0 +1,36 @@
+---
+// Donut chart as SVG. Props: data (array of {label, value, color}), center label
+const { data, centerTop = "100%", centerSub = "Traffic" } = Astro.props;
+
+const size = 200;
+const cx = size / 2;
+const cy = size / 2;
+const r = 74;
+const stroke = 26;
+const circ = 2 * Math.PI * r;
+const total = data.reduce((s, d) => s + d.value, 0);
+
+let offset = 0;
+const arcs = data.map((d) => {
+  const frac = d.value / total;
+  const dash = frac * circ;
+  const seg = { color: d.color, dash, gap: circ - dash, offset: -offset };
+  offset += dash;
+  return seg;
+});
+---
+<svg viewBox={`0 0 ${size} ${size}`} width="200" height="200" style="display:block;">
+  <circle cx={cx} cy={cy} r={r} fill="none" stroke="var(--surface3)" stroke-width={stroke} />
+  {arcs.map((a) => (
+    <circle
+      cx={cx} cy={cy} r={r} fill="none"
+      stroke={a.color} stroke-width={stroke}
+      stroke-dasharray={`${a.dash} ${a.gap}`}
+      stroke-dashoffset={a.offset}
+      transform={`rotate(-90 ${cx} ${cy})`}
+      stroke-linecap="butt"
+    />
+  ))}
+  <text x={cx} y={cy - 2} text-anchor="middle" font-size="26" font-weight="800" fill="var(--text)">{centerTop}</text>
+  <text x={cx} y={cy + 18} text-anchor="middle" font-size="11" font-weight="600" fill="var(--faint)">{centerSub}</text>
+</svg>

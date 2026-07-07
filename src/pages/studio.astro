@@ -1,0 +1,349 @@
+---
+import Layout from "../layouts/Layout.astro";
+import Icon from "../components/Icon.astro";
+
+const tools = [
+  { id: "ideas", label: "Idea generator", icon: "bulb", desc: "Fresh video concepts around any topic" },
+  { id: "titles", label: "Title writer", icon: "sparkles", desc: "Click worthy titles built for reach" },
+  { id: "description", label: "Description writer", icon: "doc", desc: "SEO friendly descriptions in seconds" },
+  { id: "tags", label: "Tags and hashtags", icon: "tag", desc: "Keyword sets that boost discovery" },
+  { id: "thumbnail", label: "Thumbnail planner", icon: "image", desc: "Concepts and text overlays that pop" },
+  { id: "script", label: "Script outline", icon: "rocket", desc: "A full structure for your next video" }
+];
+---
+<Layout title="Content Studio" subtitle="Your automation workspace for planning and writing" active="studio" page="Content Studio">
+
+  <!-- Tool selector -->
+  <div class="grid g-3" id="toolGrid" style="margin-bottom:22px;">
+    {tools.map((t, i) => (
+      <button class={`card pad tool-pick ${i === 0 ? "sel" : ""}`} data-tool={t.id} style="text-align:left; display:flex; gap:14px; align-items:flex-start;">
+        <div class="ico violet" style="width:42px;height:42px;border-radius:12px;flex-shrink:0;"><Icon name={t.icon} size={20} /></div>
+        <div>
+          <div style="font-weight:700;font-size:14.5px;">{t.label}</div>
+          <div class="faint" style="font-size:12.5px;margin-top:2px;">{t.desc}</div>
+        </div>
+      </button>
+    ))}
+  </div>
+
+  <section class="grid" style="grid-template-columns: 420px minmax(0, 1fr); gap:18px; align-items:start;">
+    <!-- Input panel -->
+    <div class="card">
+      <div class="card-head"><div><h3 id="panelTitle">Idea generator</h3><p id="panelDesc">Fresh video concepts around any topic</p></div></div>
+      <div class="card-body">
+        <div class="field">
+          <label>Your topic or niche</label>
+          <input class="input" id="topic" type="text" placeholder="For example, home coffee brewing" value="home coffee brewing" />
+          <div class="hint">Type any subject and generate ideas instantly.</div>
+        </div>
+
+        <div class="field">
+          <label>Tone</label>
+          <select class="select" id="tone">
+            <option>Energetic and bold</option>
+            <option>Friendly and casual</option>
+            <option>Professional and clear</option>
+            <option>Curious and dramatic</option>
+          </select>
+        </div>
+
+        <div class="field" id="countField">
+          <label>How many to generate</label>
+          <select class="select" id="count">
+            <option>5</option>
+            <option>8</option>
+            <option>10</option>
+          </select>
+        </div>
+
+        <button class="btn primary" id="genBtn" style="width:100%; justify-content:center; margin-top:4px;">
+          <Icon name="wand" size={17} />Generate
+        </button>
+        <p class="hint" style="text-align:center; margin-top:10px;">Runs instantly on demo content, no account needed.</p>
+      </div>
+    </div>
+
+    <!-- Output panel -->
+    <div class="card" style="min-height:420px;">
+      <div class="card-head">
+        <div><h3>Results</h3><p id="resultMeta">Ready when you are</p></div>
+        <div class="actions"><button class="btn sm ghost" id="copyAll"><Icon name="copy" size={15} />Copy all</button></div>
+      </div>
+      <div class="card-body">
+        <div class="output" id="output" style="border:none; padding:0;">
+          <div class="empty-note">Pick a tool, enter a topic, then press generate to see results here.</div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <script is:inline>
+    // ============ Generator engine (runs fully offline) ============
+    const cap = (s) => s.charAt(0).toUpperCase() + s.slice(1);
+    const titleCase = (s) => s.split(" ").map((w) => w ? cap(w) : w).join(" ");
+
+    function pick(arr, n) {
+      const copy = arr.slice();
+      const out = [];
+      for (let i = 0; i < n && copy.length; i++) {
+        // deterministic rotation based on topic length keeps it stable per topic
+        out.push(copy.shift());
+      }
+      return out;
+    }
+
+    const engines = {
+      ideas(topic, tone, n) {
+        const t = topic.trim() || "your topic";
+        const T = titleCase(t);
+        const frames = [
+          `I Tried ${T} Every Day for 30 Days`,
+          `The Beginner Guide to ${T} That Actually Works`,
+          `5 ${T} Mistakes Almost Everyone Makes`,
+          `${T} on a Budget versus ${T} With No Limits`,
+          `What Nobody Tells You About ${T}`,
+          `I Ranked the Best ${T} Methods So You Do Not Have To`,
+          `Turning ${T} Into a Full Time Income`,
+          `${T} Explained in Under 10 Minutes`,
+          `The ${T} Setup That Changed Everything for Me`,
+          `Reacting to the Worst ${T} Advice Online`
+        ];
+        return pick(frames, n).map((text) => ({ text }));
+      },
+      titles(topic, tone, n) {
+        const T = titleCase(topic.trim() || "this topic");
+        const hooks = [
+          `The ${T} Method Pros Do Not Want You to Know`,
+          `Why Your ${T} Is Not Working (and the Fix)`,
+          `I Spent 100 Hours Mastering ${T}, Here Is What I Learned`,
+          `${T}: The Only Guide You Will Ever Need`,
+          `Stop Doing ${T} Like This`,
+          `${T} in 2026 Just Changed Forever`,
+          `How I Doubled My Results With ${T}`,
+          `The Truth About ${T} Nobody Talks About`,
+          `${T} From Zero to Expert in One Video`,
+          `Everyone Is Wrong About ${T}`
+        ];
+        return pick(hooks, n).map((text) => ({ text, meta: `${text.length} characters` }));
+      },
+      description(topic, tone) {
+        const t = topic.trim() || "this topic";
+        const T = titleCase(t);
+        const body =
+`In this video we take a full look at ${t} and everything you need to get started the right way. Whether you are brand new or leveling up, this walkthrough breaks it all down step by step.
+
+Here is what we cover:
+00:00 Intro
+01:24 The core basics of ${t}
+04:10 Common mistakes to avoid
+08:35 My exact process
+13:02 Tips that save you hours
+16:40 Final thoughts and next steps
+
+If this helped you, drop a like and subscribe for a new video every week. Turn on the bell so you never miss an upload.
+
+Follow along:
+Instagram: @yourhandle
+Newsletter: yoursite.com
+
+Tags covered in this video include ${t}, ${T} tips, and a full beginner friendly breakdown.`;
+        return [{ text: body, block: true, meta: `${body.length} characters` }];
+      },
+      tags(topic) {
+        const t = (topic.trim() || "topic").toLowerCase();
+        const base = t.replace(/\s+/g, " ").trim();
+        const words = base.split(" ");
+        const compact = words.join("");
+        const tags = [
+          base, `${base} tips`, `${base} for beginners`, `how to ${base}`,
+          `best ${base}`, `${base} 2026`, `${base} guide`, `${base} tutorial`,
+          `${base} explained`, `learn ${base}`
+        ];
+        const hashtags = [
+          `#${compact}`, `#${compact}tips`, `#${words[0]}`, `#youtube`,
+          `#creator`, `#howto`, `#${compact}2026`, `#tutorial`
+        ];
+        return { tags, hashtags };
+      },
+      thumbnail(topic) {
+        const T = titleCase(topic.trim() || "your topic");
+        const concepts = [
+          { overlay: `${T}?!`, note: "Bold face on the right, giant reaction expression, arrow pointing to the subject" },
+          { overlay: `I WAS WRONG`, note: "Split screen before and after, red circle on the surprising detail" },
+          { overlay: `${T} IN 2026`, note: "Dark background, bright accent color on the key object, minimal text" },
+          { overlay: `DO NOT DO THIS`, note: "Warning style with a bold cross mark and high contrast colors" },
+          { overlay: `WORTH IT?`, note: "Close up of the item with a large question and your face reacting" }
+        ];
+        return concepts;
+      },
+      script(topic, tone) {
+        const t = topic.trim() || "your topic";
+        const T = titleCase(t);
+        return [
+          { h: "Hook (first 15 seconds)", b: `Open with a bold promise about ${t}. Show the end result first so viewers know exactly what they will get by staying.` },
+          { h: "Intro (15 to 45 seconds)", b: `Quickly introduce yourself and why you are the right person to talk about ${t}. Keep it short and set up the three things this video will cover.` },
+          { h: "Main point one", b: `Explain the core idea behind ${T}. Use a clear example and show it on screen so it is easy to follow.` },
+          { h: "Main point two", b: `Break down the most common mistake people make with ${t} and how to avoid it. Add a quick story to keep it human.` },
+          { h: "Main point three", b: `Share your exact process or framework. Number each step so viewers can pause and take notes.` },
+          { h: "Payoff", b: `Reveal the result and prove it works. This is where retention peaks, so make it satisfying.` },
+          { h: "Call to action", b: `Ask viewers to like and subscribe, then point them to a related video so the session keeps going.` }
+        ];
+      }
+    };
+
+    // ============ UI wiring ============
+    const meta = {
+      ideas: { title: "Idea generator", desc: "Fresh video concepts around any topic", count: true },
+      titles: { title: "Title writer", desc: "Click worthy titles built for reach", count: true },
+      description: { title: "Description writer", desc: "SEO friendly descriptions in seconds", count: false },
+      tags: { title: "Tags and hashtags", desc: "Keyword sets that boost discovery", count: false },
+      thumbnail: { title: "Thumbnail planner", desc: "Concepts and text overlays that pop", count: false },
+      script: { title: "Script outline", desc: "A full structure for your next video", count: false }
+    };
+
+    let current = "ideas";
+
+    function esc(s) { return s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;"); }
+    function copySvg() {
+      return '<button class="copy" data-copy-src="1" title="Copy"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg></button>';
+    }
+
+    function selectTool(id) {
+      current = id;
+      document.querySelectorAll(".tool-pick").forEach((c) => c.classList.toggle("sel", c.getAttribute("data-tool") === id));
+      document.getElementById("panelTitle").textContent = meta[id].title;
+      document.getElementById("panelDesc").textContent = meta[id].desc;
+      document.getElementById("countField").style.display = meta[id].count ? "" : "none";
+    }
+
+    function render(items) {
+      const out = document.getElementById("output");
+      out.innerHTML = "";
+
+      if (current === "tags") {
+        const wrap = document.createElement("div");
+        wrap.innerHTML =
+          '<div style="font-weight:700;font-size:13px;margin-bottom:10px;">Keyword tags</div>' +
+          '<div class="chips" style="margin-bottom:20px;">' +
+            items.tags.map((t) => `<span class="chip" data-copy="${esc(t)}" style="cursor:pointer;">${esc(t)}</span>`).join("") +
+          '</div>' +
+          '<div style="font-weight:700;font-size:13px;margin-bottom:10px;">Hashtags</div>' +
+          '<div class="chips">' +
+            items.hashtags.map((t) => `<span class="chip active" data-copy="${esc(t)}" style="cursor:pointer;">${esc(t)}</span>`).join("") +
+          '</div>';
+        out.appendChild(wrap);
+        document.getElementById("resultMeta").textContent = items.tags.length + " tags and " + items.hashtags.length + " hashtags";
+        return;
+      }
+
+      if (current === "thumbnail") {
+        items.forEach((c) => {
+          const el = document.createElement("div");
+          el.className = "output-item";
+          el.style.alignItems = "center";
+          el.innerHTML =
+            `<div style="width:96px;height:54px;border-radius:8px;flex-shrink:0;display:grid;place-items:center;font-weight:800;font-size:13px;color:#fff;background:linear-gradient(135deg,var(--brand),var(--violet));text-align:center;padding:4px;line-height:1.1;">${esc(c.overlay)}</div>` +
+            `<div style="flex:1;"><div style="font-weight:700;font-size:13px;">Text overlay: ${esc(c.overlay)}</div><div class="faint" style="font-size:12.5px;margin-top:3px;">${esc(c.note)}</div></div>` +
+            `<span data-copy="${esc(c.overlay + ": " + c.note)}">${copySvg()}</span>`;
+          out.appendChild(el);
+        });
+        document.getElementById("resultMeta").textContent = items.length + " concepts";
+        return;
+      }
+
+      if (current === "script") {
+        items.forEach((s, i) => {
+          const el = document.createElement("div");
+          el.className = "output-item";
+          el.style.flexDirection = "column";
+          el.style.alignItems = "stretch";
+          el.innerHTML =
+            `<div class="flex between center"><div style="font-weight:700;font-size:13px;color:var(--violet2);">${i + 1}. ${esc(s.h)}</div><span data-copy="${esc(s.b)}">${copySvg()}</span></div>` +
+            `<div style="font-size:13px;margin-top:6px;line-height:1.5;">${esc(s.b)}</div>`;
+          out.appendChild(el);
+        });
+        document.getElementById("resultMeta").textContent = items.length + " sections";
+        return;
+      }
+
+      if (current === "description") {
+        const s = items[0];
+        const el = document.createElement("div");
+        el.className = "output-item";
+        el.style.flexDirection = "column";
+        el.style.alignItems = "stretch";
+        el.innerHTML =
+          `<div class="flex between center" style="margin-bottom:8px;"><div style="font-weight:700;font-size:13px;color:var(--violet2);">Optimized description</div><span data-copy="${esc(s.text)}">${copySvg()}</span></div>` +
+          `<pre style="white-space:pre-wrap;font-family:inherit;font-size:13px;line-height:1.55;margin:0;">${esc(s.text)}</pre>`;
+        out.appendChild(el);
+        document.getElementById("resultMeta").textContent = s.meta;
+        return;
+      }
+
+      // ideas and titles
+      items.forEach((it, i) => {
+        const el = document.createElement("div");
+        el.className = "output-item";
+        el.innerHTML =
+          `<span class="rank" style="width:24px;height:24px;font-size:11px;">${i + 1}</span>` +
+          `<div style="flex:1;"><div>${esc(it.text)}</div>${it.meta ? `<div class="faint" style="font-size:11.5px;margin-top:3px;">${esc(it.meta)}</div>` : ""}</div>` +
+          `<span data-copy="${esc(it.text)}">${copySvg()}</span>`;
+        out.appendChild(el);
+      });
+      document.getElementById("resultMeta").textContent = items.length + " results generated";
+    }
+
+    let lastForCopyAll = "";
+    function generate() {
+      const topic = document.getElementById("topic").value;
+      const tone = document.getElementById("tone").value;
+      const n = parseInt(document.getElementById("count").value, 10) || 5;
+      const result = engines[current](topic, tone, n);
+      render(result);
+
+      // build copy all text
+      if (current === "tags") lastForCopyAll = result.tags.join(", ") + "\n" + result.hashtags.join(" ");
+      else if (current === "thumbnail") lastForCopyAll = result.map((c) => c.overlay + ": " + c.note).join("\n");
+      else if (current === "script") lastForCopyAll = result.map((s) => s.h + "\n" + s.b).join("\n\n");
+      else if (current === "description") lastForCopyAll = result[0].text;
+      else lastForCopyAll = result.map((r) => r.text).join("\n");
+    }
+
+    document.getElementById("toolGrid").addEventListener("click", (e) => {
+      const pick = e.target.closest(".tool-pick");
+      if (pick) { selectTool(pick.getAttribute("data-tool")); generate(); }
+    });
+    document.getElementById("genBtn").addEventListener("click", generate);
+    document.getElementById("topic").addEventListener("keydown", (e) => { if (e.key === "Enter") generate(); });
+
+    document.getElementById("copyAll").addEventListener("click", () => {
+      if (!lastForCopyAll) return;
+      if (navigator.clipboard) navigator.clipboard.writeText(lastForCopyAll);
+      window.showToast("All results copied");
+    });
+
+    // copy buttons inside output
+    document.getElementById("output").addEventListener("click", (e) => {
+      const c = e.target.closest("[data-copy]");
+      if (c) {
+        const text = c.getAttribute("data-copy");
+        if (navigator.clipboard) navigator.clipboard.writeText(text);
+        window.showToast("Copied to clipboard");
+      }
+    });
+
+    // first run
+    selectTool("ideas");
+    generate();
+  </script>
+
+  <style>
+    .tool-pick { transition: all .16s ease; cursor: pointer; }
+    .tool-pick:hover { border-color: var(--border2); transform: translateY(-2px); }
+    .tool-pick.sel { border-color: var(--violet); box-shadow: inset 0 0 0 1px var(--violet), var(--glow); }
+    .tool-pick.sel .ico { background: linear-gradient(135deg, var(--brand), var(--violet)); color: #fff; }
+    @media (max-width: 940px) {
+      section.grid { grid-template-columns: minmax(0, 1fr) !important; }
+    }
+  </style>
+</Layout>

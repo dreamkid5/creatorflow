@@ -1,0 +1,159 @@
+---
+import Layout from "../layouts/Layout.astro";
+import Icon from "../components/Icon.astro";
+import StatCard from "../components/StatCard.astro";
+import LineChart from "../components/LineChart.astro";
+import DonutChart from "../components/DonutChart.astro";
+import { stats, viewsSeries, subsSeries, seriesLabels, traffic, topVideos, queue, activity } from "../data/demo.js";
+
+const hasGrowth = viewsSeries.length >= 2;
+---
+<Layout title="Dashboard" subtitle="Welcome back, here is how your channel is performing" active="dashboard" page="Dashboard">
+
+  <!-- Stat cards -->
+  <section class="grid g-4">
+    {stats.map((s) => (
+      <StatCard {...s} />
+    ))}
+  </section>
+
+  <!-- Charts row -->
+  <section class="grid g-3 mt-18">
+    <div class="card span-2">
+      <div class="card-head">
+        <div>
+          <h3>Views and subscriber growth</h3>
+          <p>Rolling performance over the last reporting points</p>
+        </div>
+        {hasGrowth && (
+          <div class="actions">
+            <button class="chip active">Views</button>
+            <button class="chip">Subscribers</button>
+          </div>
+        )}
+      </div>
+      <div class="card-body">
+        {hasGrowth ? (
+          <Fragment>
+            <div id="growthViews"><LineChart values={viewsSeries} color="var(--violet)" id="views" labels={seriesLabels} height={240} /></div>
+            <div id="growthSubs" style="display:none;"><LineChart values={subsSeries} color="var(--brand)" id="subs" labels={seriesLabels} height={240} /></div>
+            <div class="legend mt-18">
+              <div class="li"><span class="d" style="background:var(--violet)"></span>Views in thousands</div>
+              <div class="li"><span class="d" style="background:var(--brand)"></span>New subscribers in thousands</div>
+            </div>
+          </Fragment>
+        ) : (
+          <div class="empty-note">No data yet. Connect your YouTube channel to see your growth here.</div>
+        )}
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="card-head"><div><h3>Traffic sources</h3><p>Where views come from</p></div></div>
+      <div class="card-body" style="display:flex; flex-direction:column; align-items:center; gap:18px;">
+        <DonutChart data={traffic} centerTop="0" centerSub="Total views" />
+        {traffic.length ? (
+          <div style="width:100%;">
+            {traffic.map((t) => (
+              <div class="lrow" style="padding:8px 0;">
+                <span class="d" style={`width:11px;height:11px;border-radius:3px;background:${t.color};flex-shrink:0;`}></span>
+                <div class="grow"><div class="t" style="font-size:13px;">{t.label}</div></div>
+                <div class="val" style="font-size:13px;">{t.value}%</div>
+              </div>
+            ))}
+          </div>
+        ) : (
+          <div class="empty-note">No data yet.</div>
+        )}
+      </div>
+    </div>
+  </section>
+
+  <!-- Lower row -->
+  <section class="grid g-3 mt-18">
+    <!-- Top videos -->
+    <div class="card span-2">
+      <div class="card-head">
+        <div><h3>Top performing videos</h3><p>Ranked by views this period</p></div>
+        <div class="actions"><a href="/videos" class="btn sm ghost">View all <Icon name="external" size={15} /></a></div>
+      </div>
+      <div class="card-body" style="padding-top:6px;">
+        {topVideos.length ? topVideos.map((v, i) => (
+          <div class="lrow">
+            <span class={`rank ${i === 0 ? "top" : ""}`}>{i + 1}</span>
+            <div class="grow">
+              <div class="t">{v.title}</div>
+              <div class="bar" style="margin-top:8px;"><span style={`width:${v.pct}%`}></span></div>
+            </div>
+            <div class="val">{v.views}</div>
+          </div>
+        )) : (
+          <div class="empty-note">No videos yet. The videos you publish will rank here.</div>
+        )}
+      </div>
+    </div>
+
+    <!-- Activity feed -->
+    <div class="card">
+      <div class="card-head"><div><h3>Recent activity</h3><p>Latest channel events</p></div></div>
+      <div class="card-body" style="padding-top:8px;">
+        {activity.length ? activity.map((a) => (
+          <div class="lrow" style="align-items:flex-start;">
+            <div class={`ico ${a.color}`} style="width:34px;height:34px;border-radius:9px;flex-shrink:0;">
+              <Icon name={a.icon} size={16} />
+            </div>
+            <div class="grow">
+              <div class="t" style="white-space:normal; font-weight:500; line-height:1.35;">{a.text}</div>
+              <div class="s" style="margin-top:2px;">{a.time}</div>
+            </div>
+          </div>
+        )) : (
+          <div class="empty-note">No activity yet.</div>
+        )}
+      </div>
+    </div>
+  </section>
+
+  <!-- Publishing queue -->
+  <section class="mt-18">
+    <div class="card">
+      <div class="card-head">
+        <div><h3>Publishing queue</h3><p>Videos lined up for release</p></div>
+        <div class="actions"><a href="/schedule" class="btn primary sm"><Icon name="plus" size={15} />Schedule upload</a></div>
+      </div>
+      <div class="card-body" style="padding:0;">
+        <table class="table">
+          <thead><tr><th>Video</th><th>Planned release</th><th>Status</th><th></th></tr></thead>
+          <tbody>
+            {queue.length ? queue.map((q) => (
+              <tr>
+                <td><div class="vid-title">{q.title}</div></td>
+                <td class="muted">{q.when}</td>
+                <td><span class={`badge ${q.status}`}><span class="d"></span>{q.status.charAt(0).toUpperCase() + q.status.slice(1)}</span></td>
+                <td style="text-align:right;"><button class="btn sm ghost" data-copy={q.title}>Copy title</button></td>
+              </tr>
+            )) : (
+              <tr><td colspan="4" class="muted" style="text-align:center; padding:22px;">No videos in the queue yet. Schedule one from the Auto Video page.</td></tr>
+            )}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </section>
+
+  <script is:inline>
+    document.addEventListener("click", function (e) {
+      const chip = e.target.closest(".card-head .chip");
+      if (!chip || !chip.closest("#growthViews, .card")) return;
+      const head = chip.closest(".card-head");
+      if (!head || !head.querySelector(".chip")) return;
+      const views = document.getElementById("growthViews");
+      const subs = document.getElementById("growthSubs");
+      if (!views || !subs) return;
+      head.querySelectorAll(".chip").forEach((c) => c.classList.remove("active"));
+      chip.classList.add("active");
+      if (chip.textContent.trim() === "Views") { views.style.display = ""; subs.style.display = "none"; }
+      else { views.style.display = "none"; subs.style.display = ""; }
+    });
+  </script>
+</Layout>

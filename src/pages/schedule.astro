@@ -1,0 +1,150 @@
+---
+import Layout from "../layouts/Layout.astro";
+import Icon from "../components/Icon.astro";
+import { calendarEvents, queue } from "../data/demo.js";
+
+// July 2026 starts on a Wednesday. 1st = index 3 (Sun=0). 31 days.
+const firstDow = 3;
+const daysInMonth = 31;
+const today = 7;
+const dow = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
+
+const cells = [];
+for (let i = 0; i < firstDow; i++) cells.push(null);
+for (let d = 1; d <= daysInMonth; d++) cells.push(d);
+while (cells.length % 7 !== 0) cells.push(null);
+
+const label = (s) => s.charAt(0).toUpperCase() + s.slice(1);
+const bestTimes = [
+  { day: "Saturday", time: "2:00 PM to 4:00 PM", score: 96 },
+  { day: "Friday", time: "5:00 PM to 7:00 PM", score: 91 },
+  { day: "Sunday", time: "11:00 AM to 1:00 PM", score: 84 }
+];
+---
+<Layout title="Schedule" subtitle="Plan and automate every upload with confidence" active="schedule" page="Schedule">
+
+  <section class="grid vstudio-cols" style="grid-template-columns: minmax(0, 1fr) 340px; gap:18px;">
+    <!-- Calendar -->
+    <div class="card">
+      <div class="card-head">
+        <div><h3>July 2026</h3><p>Upload calendar</p></div>
+        <div class="actions">
+          <button class="icon-btn" style="width:34px;height:34px;" title="Previous"><Icon name="up" size={15} /></button>
+          <button class="icon-btn" style="width:34px;height:34px;" title="Next"><Icon name="down" size={15} /></button>
+          <button class="btn primary sm"><Icon name="plus" size={15} />Add</button>
+        </div>
+      </div>
+      <div class="card-body">
+        <div class="cal-grid" style="margin-bottom:8px;">
+          {dow.map((d) => <div class="cal-dow">{d}</div>)}
+        </div>
+        <div class="cal-grid">
+          {cells.map((d) => (
+            d === null ? (
+              <div class="cal-cell dim"></div>
+            ) : (
+              <div class={`cal-cell ${d === today ? "today" : ""}`}>
+                <div class="num">{d}</div>
+                {(calendarEvents[d] || []).map((ev) => (
+                  <div class={`cal-event ${ev.type}`} title={ev.t}>{ev.t}</div>
+                ))}
+              </div>
+            )
+          ))}
+        </div>
+        <div class="legend mt-18">
+          <div class="li"><span class="d" style="background:var(--green)"></span>Published</div>
+          <div class="li"><span class="d" style="background:var(--violet2)"></span>Scheduled</div>
+          <div class="li"><span class="d" style="background:var(--cyan)"></span>Ready</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Right column -->
+    <div style="display:flex; flex-direction:column; gap:18px;">
+      <div class="card">
+        <div class="card-head"><div><h3>Smart timing</h3><p>Best slots to publish</p></div></div>
+        <div class="card-body" style="padding-top:10px;">
+          {bestTimes.map((b, i) => (
+            <div class="lrow" style="padding:11px 0;">
+              <div class={`ico ${i === 0 ? "green" : "violet"}`} style="width:36px;height:36px;border-radius:10px;flex-shrink:0;">
+                <Icon name="target" size={17} />
+              </div>
+              <div class="grow">
+                <div class="t" style="font-size:13.5px;">{b.day}</div>
+                <div class="s">{b.time}</div>
+              </div>
+            </div>
+          ))}
+          <p class="hint" style="margin-top:12px;">General good starting slots. These refine to your own audience once your YouTube channel is connected.</p>
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="card-head"><div><h3>Automation</h3><p>Hands free publishing</p></div></div>
+        <div class="card-body" style="padding-top:10px;">
+          <div class="flex between center" style="padding:9px 0;">
+            <div><div style="font-weight:600;font-size:13.5px;">Auto publish queue</div><div class="s faint" style="font-size:12px;">Release videos at chosen times</div></div>
+            <label class="switch"><input type="checkbox" checked /><span class="track"></span></label>
+          </div>
+          <div class="flex between center" style="padding:9px 0;border-top:1px solid var(--border);">
+            <div><div style="font-weight:600;font-size:13.5px;">Auto share to socials</div><div class="s faint" style="font-size:12px;">Post links on release</div></div>
+            <label class="switch"><input type="checkbox" checked /><span class="track"></span></label>
+          </div>
+          <div class="flex between center" style="padding:9px 0;border-top:1px solid var(--border);">
+            <div><div style="font-weight:600;font-size:13.5px;">Comment auto reply</div><div class="s faint" style="font-size:12px;">Greet new commenters</div></div>
+            <label class="switch"><input type="checkbox" /><span class="track"></span></label>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- Queue -->
+  <section class="mt-18">
+    <div class="card">
+      <div class="card-head"><div><h3>Upcoming queue</h3><p>Everything lined up for release</p></div></div>
+      <div class="card-body" style="padding:0;">
+        <table class="table">
+          <thead><tr><th>Video</th><th>Release</th><th>Status</th><th></th></tr></thead>
+          <tbody>
+            {queue.length ? queue.map((q) => (
+              <tr>
+                <td><div class="vid-title">{q.title}</div></td>
+                <td class="muted">{q.when}</td>
+                <td><span class={`badge ${q.status}`}><span class="d"></span>{label(q.status)}</span></td>
+                <td style="text-align:right;"><button class="btn sm ghost">Edit</button></td>
+              </tr>
+            )) : (
+              <tr><td colspan="4" class="muted" style="text-align:center; padding:22px;">Nothing scheduled yet.</td></tr>
+            )}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </section>
+
+  <script is:inline>
+    (function () {
+      // remember the automation switches between visits
+      const toggles = Array.from(document.querySelectorAll(".switch input[type=checkbox]"));
+      toggles.forEach((t, i) => {
+        const key = "cf_sched_toggle_" + i;
+        const saved = localStorage.getItem(key);
+        if (saved !== null) t.checked = saved === "1";
+        t.addEventListener("change", () => {
+          localStorage.setItem(key, t.checked ? "1" : "0");
+          window.showToast && window.showToast(t.checked ? "Automation turned on" : "Automation turned off");
+        });
+      });
+      // the calendar is a planning view, real creation happens in Auto Video
+      document.querySelectorAll("button").forEach((b) => {
+        const title = b.getAttribute("title");
+        const label = b.textContent.trim();
+        if (title === "Previous" || title === "Next") b.addEventListener("click", () => window.showToast && window.showToast("This planning calendar shows July 2026"));
+        if (label === "Add") b.addEventListener("click", () => window.showToast && window.showToast("Create and schedule a video on the Auto Video page"));
+        if (label === "Edit") b.addEventListener("click", () => window.showToast && window.showToast("Open the Auto Video page to edit a video"));
+      });
+    })();
+  </script>
+</Layout>

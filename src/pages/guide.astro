@@ -1,0 +1,338 @@
+---
+import Layout from "../layouts/Layout.astro";
+import Icon from "../components/Icon.astro";
+
+const steps = [
+  {
+    n: "1",
+    title: "Write a short script",
+    body: "Break the story into a few short, vivid sentences. Each sentence or paragraph becomes its own illustrated scene."
+  },
+  {
+    n: "2",
+    title: "Build the scenes",
+    body: "In Video Studio, paste the script into the Story builder, pick Watercolor, and press Build story from script. Each scene is illustrated onto the timeline."
+  },
+  {
+    n: "3",
+    title: "Add the voiceover",
+    body: "In the Narration card, press Generate natural voiceover for a free neural voice that runs on your device and bakes into the export, or record your own in the Voiceover recorder. No key needed."
+  },
+  {
+    n: "4",
+    title: "Line it up",
+    body: "Press Auto fit clips to audio so each scene lands with the words. Add background music and lower its volume for that calm documentary feel."
+  },
+  {
+    n: "5",
+    title: "Export",
+    body: "Press Export video for a real MP4, then Save. For many videos at once, use the Bulk Studio with a CSV."
+  }
+];
+---
+<Layout title="Guide" subtitle="Make a narrated, illustrated video from a script" active="guide" page="Guide">
+
+  <!-- Sample preview -->
+  <div class="card" style="margin-bottom:22px;">
+    <div class="card-head">
+      <div><h3>Preview: a video built from a script</h3><p>The same watercolor sample made in the Video Studio</p></div>
+      <div class="actions"><button class="btn sm primary" id="sendToStudio"><Icon name="film" size={15} />Open in Video Studio with this script</button></div>
+    </div>
+    <div class="card-body">
+      <div class="grid" style="grid-template-columns: minmax(0,1fr) 280px; gap:20px; align-items:start;" id="previewGrid">
+        <div>
+          <div class="player-frame"><canvas id="sample" width="1280" height="720"></canvas></div>
+          <div class="player-bar">
+            <button class="play-btn" id="samplePlay" style="width:44px;height:44px;"><Icon name="play" size={18} /></button>
+            <span class="time" id="sampleCur">0:00</span>
+            <div class="scrub" id="sampleScrub"><div class="fill" id="sampleFill"></div></div>
+            <span class="time" id="sampleTot">0:16</span>
+          </div>
+          <div class="flex gap-10" style="margin-top:12px; align-items:center; flex-wrap:wrap;">
+            <button class="btn" id="sampleDownload" disabled><Icon name="download" size={15} />Download MP4</button>
+            <label class="flex center gap-10" style="font-size:12.5px; cursor:pointer;"><input type="checkbox" id="sampleVoice" checked style="width:16px;height:16px;accent-color:var(--violet);" />Narrate with natural voice</label>
+            <select class="select" id="sampleVoiceSel" style="width:auto; padding:6px 10px; font-size:12.5px;">
+              <option value="bm_george">George, UK documentary</option>
+              <option value="af_heart">Aria, warm US female</option>
+              <option value="am_michael">Michael, calm US male</option>
+              <option value="bf_emma">Emma, UK female</option>
+              <option value="af_bella">Bella, US female</option>
+              <option value="am_adam">Adam, US male</option>
+            </select>
+            <span class="hint" id="sampleStatus" style="align-self:center;">Press play to load the sample</span>
+          </div>
+          <audio id="sampleAudio" style="display:none;"></audio>
+        </div>
+        <div>
+          <div style="font-weight:700; font-size:13px; margin-bottom:10px;">The script behind it</div>
+          <div id="scriptList" style="display:flex; flex-direction:column; gap:10px;"></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Steps -->
+  <div class="section-head"><div><h2>How to make one</h2><p>Five steps from a script to a finished video</p></div></div>
+  <section class="grid g-2" style="margin-bottom:22px;">
+    {steps.map((s) => (
+      <div class="card pad" style="display:flex; gap:16px; align-items:flex-start;">
+        <div style="width:38px;height:38px;border-radius:11px;flex-shrink:0;display:grid;place-items:center;font-weight:800;color:#fff;background:linear-gradient(135deg,var(--brand),var(--violet));">{s.n}</div>
+        <div>
+          <div style="font-weight:700; font-size:15px; margin-bottom:4px;">{s.title}</div>
+          <div class="muted" style="font-size:13.5px; line-height:1.55;">{s.body}</div>
+        </div>
+      </div>
+    ))}
+  </section>
+
+  <!-- Two methods and extras -->
+  <section class="grid g-2" style="margin-bottom:22px;">
+    <div class="card">
+      <div class="card-head"><div><h3>Fast way</h3><p>Story builder</p></div></div>
+      <div class="card-body">
+        <p class="muted" style="font-size:13.5px; line-height:1.6;">Paste your whole script into the Story builder in the Video Studio and press Build story from script. It splits the script into scenes, illustrates each one, and loads the script into Narration. This is how the sample above was made.</p>
+      </div>
+    </div>
+    <div class="card">
+      <div class="card-head"><div><h3>Control way</h3><p>AI scene generator</p></div></div>
+      <div class="card-body">
+        <p class="muted" style="font-size:13.5px; line-height:1.6;">For stronger art, use the AI scene generator and write one visual prompt per line, describing the picture rather than the narration. Then paste the narration into the Narration card separately.</p>
+      </div>
+    </div>
+  </section>
+
+  <div class="card" style="margin-bottom:22px;">
+    <div class="card-head"><div><h3>Do it in bulk</h3><p>Many videos from a CSV</p></div></div>
+    <div class="card-body">
+      <p class="muted" style="font-size:13.5px; line-height:1.6; margin-bottom:12px;">In the Bulk Studio, press Template to download a CSV, add one row per video with the columns title, script, style, voice, and music, then Upload CSV and Start batch. Use Watch folder to turn any CSV you drop into a folder into finished videos automatically. For a whole channel on a schedule, the worker folder renders on a server and can auto upload to YouTube.</p>
+      <div class="flex gap-10">
+        <a href="/bulk" class="btn sm"><Icon name="layers" size={15} />Open Bulk Studio</a>
+        <a href="/automations" class="btn sm ghost"><Icon name="sliders" size={15} />Automations</a>
+      </div>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="card-head"><div><h3>Tips to match a documentary look</h3></div></div>
+    <div class="card-body">
+      <ul style="margin:0; padding-left:18px; color:var(--muted); font-size:13.5px; line-height:1.9;">
+        <li>Keep sentences short and vivid, one image per idea</li>
+        <li>Reuse the same style words every scene, for example watercolor illustration, soft washes, warm candlelight</li>
+        <li>For a consistent character, repeat the same description each scene, such as a gray bearded Roman man in a white and red toga</li>
+        <li>Choose a calm voice and a slower speed for the narration</li>
+        <li>Add soft background music at a low volume</li>
+      </ul>
+    </div>
+  </div>
+
+  <script is:inline>
+  (function () {
+    const canvas = document.getElementById("sample");
+    const ctx = canvas.getContext("2d");
+    const W = canvas.width, H = canvas.height;
+    const STYLE = "watercolor illustration, soft washes, textured paper, hand painted, muted palette";
+    const SCENE_LEN = 4, TR = 0.6;
+
+    const scenes = [
+      { seed: 2000, prompt: "In ancient Rome, a weary man sits by candlelight, a scroll before him, unable to quiet his restless mind." },
+      { seed: 2007, prompt: "For his sleeplessness, physicians reach for a humble root known as valerian, prized since the days of Galen." },
+      { seed: 2014, prompt: "Through medieval monasteries, monks tend the plant in walled gardens and brew it into calming evening tisanes." },
+      { seed: 2021, prompt: "By dawn, the gentle herb has done its quiet work, and the restless sleeper finds peace at last." }
+    ];
+    let total = scenes.length * SCENE_LEN, sceneLen = SCENE_LEN;
+
+    // show the script lines
+    document.getElementById("scriptList").innerHTML = scenes.map((s, i) =>
+      '<div style="display:flex;gap:10px;font-size:12.5px;line-height:1.5;">' +
+      '<span style="width:20px;height:20px;flex-shrink:0;border-radius:6px;background:var(--surface3);display:grid;place-items:center;font-weight:800;font-size:11px;color:var(--muted);">' + (i + 1) + '</span>' +
+      '<span class="muted">' + s.prompt + '</span></div>'
+    ).join("");
+
+    document.getElementById("sampleTot").textContent = fmt(total);
+
+    // Send this exact script to the Video Studio, prefilled
+    const SCRIPT = scenes.map((s) => s.prompt).join("\n\n");
+    document.getElementById("sendToStudio").addEventListener("click", () => {
+      try { localStorage.setItem("cf-prefill-script", SCRIPT); } catch (e) {}
+      window.location.href = "/create";
+    });
+
+    function fmt(s) { s = Math.max(0, s); const m = Math.floor(s / 60), ss = Math.floor(s % 60); return m + ":" + (ss < 10 ? "0" : "") + ss; }
+    function setStatus(m) { document.getElementById("sampleStatus").textContent = m; }
+
+    // Free neural narration (Kokoro), no key. Plays and bakes into the download.
+    const voiceCb = document.getElementById("sampleVoice");
+    const sampleAudio = document.getElementById("sampleAudio");
+    let narrationReady = false, narrating = false;
+    let audioCtx = null, voiceSrc = null, streamDest = null;
+    function ensureGraph() {
+      if (audioCtx) return;
+      audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+      voiceSrc = audioCtx.createMediaElementSource(sampleAudio);
+      streamDest = audioCtx.createMediaStreamDestination();
+      voiceSrc.connect(streamDest); voiceSrc.connect(audioCtx.destination);
+    }
+    async function ensureNarration() {
+      if (narrationReady || narrating) return narrationReady;
+      narrating = true;
+      setStatus("Preparing the natural voice, a one time download");
+      try {
+        const mod = await import("/natural-voice.js");
+        const voice = document.getElementById("sampleVoiceSel").value;
+        const blob = await mod.synthesize(SCRIPT, voice, (p) => setStatus(p < 100 ? ("Downloading the voice model " + p + "%") : "Generating the narration"));
+        sampleAudio.src = URL.createObjectURL(blob);
+        await new Promise((res) => { sampleAudio.onloadedmetadata = () => res(); sampleAudio.onerror = () => res(); });
+        if (isFinite(sampleAudio.duration) && sampleAudio.duration > 0) {
+          total = sampleAudio.duration; sceneLen = total / scenes.length;
+          document.getElementById("sampleTot").textContent = fmt(total);
+        }
+        ensureGraph();
+        narrationReady = true; setStatus("Narrated with a natural voice");
+      } catch (e) { setStatus("Voice could not load, playing without it"); }
+      narrating = false;
+      return narrationReady;
+    }
+    voiceCb.addEventListener("change", () => { if (!voiceCb.checked) { try { sampleAudio.pause(); } catch (e) {} } });
+    document.getElementById("sampleVoiceSel").addEventListener("change", (e) => {
+      narrationReady = false;
+      try { sampleAudio.pause(); } catch (err) {}
+      if (playing) stop();
+      total = scenes.length * SCENE_LEN; sceneLen = SCENE_LEN;
+      document.getElementById("sampleTot").textContent = fmt(total);
+      curT = 0; setHead(0);
+      setStatus("Voice set to " + e.target.selectedOptions[0].text.split(",")[0] + ". Press play to hear it");
+    });
+
+    let imgs = [], loaded = false, loading = false;
+    function sceneUrl(s) { return "/ai-image/" + encodeURIComponent(s.prompt + ", " + STYLE) + "?width=1280&height=720&nologo=true&model=flux&seed=" + s.seed; }
+
+    function loadScenes() {
+      return new Promise((resolve) => {
+        let done = 0; imgs = new Array(scenes.length).fill(null);
+        scenes.forEach((s, i) => {
+          const img = new Image();
+          img.onload = () => { imgs[i] = img; if (++done === scenes.length) resolve(); document.getElementById("sampleStatus").textContent = "Loaded " + done + " of " + scenes.length + " scenes"; };
+          img.onerror = () => { if (++done === scenes.length) resolve(); };
+          img.src = sceneUrl(s);
+        });
+      });
+    }
+
+    function cover(img, alpha, scale) {
+      if (!img) return;
+      ctx.save(); ctx.globalAlpha = alpha;
+      const ir = img.width / img.height, cr = W / H; let dw, dh;
+      if (ir > cr) { dh = H * scale; dw = dh * ir; } else { dw = W * scale; dh = dw / ir; }
+      ctx.drawImage(img, (W - dw) / 2, (H - dh) / 2, dw, dh);
+      ctx.restore();
+    }
+    function caption(text) {
+      ctx.save();
+      ctx.font = "600 40px Inter, sans-serif"; ctx.textAlign = "center"; ctx.textBaseline = "middle";
+      const maxW = W - 200; const words = text.split(" "); let line = "", lines = [];
+      words.forEach((w) => { const t = line ? line + " " + w : w; if (ctx.measureText(t).width > maxW && line) { lines.push(line); line = w; } else line = t; });
+      if (line) lines.push(line);
+      const lh = 50, bh = lines.length * lh + 24, by = H - bh - 34;
+      ctx.fillStyle = "rgba(5,6,10,.66)";
+      ctx.fillRect(0, by - 6, W, bh + 12);
+      ctx.fillStyle = "#fff";
+      let y = by + 24;
+      lines.forEach((ln) => { ctx.fillText(ln, W / 2, y); y += lh; });
+      ctx.restore();
+    }
+
+    function draw(t) {
+      ctx.fillStyle = "#05060a"; ctx.fillRect(0, 0, W, H);
+      let acc = 0, i = 0, lt = 0;
+      for (i = 0; i < scenes.length; i++) { if (t < acc + sceneLen || i === scenes.length - 1) { lt = t - acc; break; } acc += sceneLen; }
+      lt = Math.max(0, Math.min(lt, sceneLen));
+      const scale = 1 + 0.09 * (lt / sceneLen);
+      const p = Math.min(1, lt / TR);
+      if (i > 0 && lt < TR) { cover(imgs[i - 1], 1, 1 + 0.09); cover(imgs[i], p, scale); }
+      else if (i === 0 && lt < TR) { cover(imgs[i], 1, scale); ctx.save(); ctx.globalAlpha = 1 - p; ctx.fillStyle = "#000"; ctx.fillRect(0, 0, W, H); ctx.restore(); }
+      else cover(imgs[i], 1, scale);
+      caption(scenes[i].prompt);
+    }
+
+    function placeholder() {
+      const g = ctx.createLinearGradient(0, 0, W, H); g.addColorStop(0, "#141726"); g.addColorStop(1, "#222741");
+      ctx.fillStyle = g; ctx.fillRect(0, 0, W, H);
+      ctx.fillStyle = "#9aa2c4"; ctx.font = "600 40px Inter, sans-serif"; ctx.textAlign = "center"; ctx.textBaseline = "middle";
+      ctx.fillText("Press play to load the sample", W / 2, H / 2);
+    }
+    placeholder();
+
+    // playback
+    let playing = false, raf = null, startStamp = 0, seekOffset = 0, curT = 0;
+    const playBtn = document.getElementById("samplePlay");
+    function setHead(t) { curT = t; document.getElementById("sampleFill").style.width = Math.min(100, (t / total) * 100) + "%"; document.getElementById("sampleCur").textContent = fmt(t); }
+    function loop(now) {
+      const t = seekOffset + (now - startStamp) / 1000;
+      if (t >= total) { seekOffset = 0; curT = 0; startStamp = now; if (narrationReady) { try { sampleAudio.currentTime = 0; } catch (e) {} } draw(0); setHead(0); raf = requestAnimationFrame(loop); return; }
+      draw(t); setHead(t); raf = requestAnimationFrame(loop);
+    }
+    function play() {
+      playing = true;
+      playBtn.innerHTML = '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round"><path d="M8 5v14M16 5v14"/></svg>';
+      seekOffset = curT >= total ? 0 : curT;
+      if (narrationReady && voiceCb.checked) { try { if (audioCtx.state === "suspended") audioCtx.resume(); sampleAudio.currentTime = seekOffset; sampleAudio.play(); } catch (e) {} }
+      startStamp = performance.now(); raf = requestAnimationFrame(loop);
+    }
+    function stop() {
+      playing = false;
+      playBtn.innerHTML = '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round"><path d="M6 4l14 8-14 8z"/></svg>';
+      cancelAnimationFrame(raf);
+      try { sampleAudio.pause(); } catch (e) {}
+    }
+    playBtn.addEventListener("click", async () => {
+      if (!loaded) {
+        if (loading) return;
+        loading = true;
+        setStatus("Loading scenes, this takes a moment");
+        await loadScenes();
+        loaded = true; loading = false;
+        document.getElementById("sampleDownload").disabled = false;
+        setStatus("Scenes ready");
+      }
+      if (playing) { stop(); return; }
+      if (voiceCb.checked && !narrationReady) await ensureNarration();
+      play();
+    });
+    document.getElementById("sampleScrub").addEventListener("click", (e) => {
+      if (!loaded) return;
+      const r = e.currentTarget.getBoundingClientRect();
+      curT = ((e.clientX - r.left) / r.width) * total; draw(curT); setHead(curT);
+      if (playing) { seekOffset = curT; startStamp = performance.now(); }
+    });
+
+    // download the sample as an MP4, with the natural narration baked in
+    document.getElementById("sampleDownload").addEventListener("click", async () => {
+      if (!loaded) return;
+      const btn = document.getElementById("sampleDownload");
+      btn.disabled = true;
+      if (voiceCb.checked && !narrationReady) await ensureNarration();
+      setStatus("Rendering MP4");
+      const fps = 30;
+      const stream = canvas.captureStream(fps);
+      let tracks = stream.getVideoTracks();
+      if (narrationReady) { try { if (audioCtx.state === "suspended") await audioCtx.resume(); tracks = tracks.concat(streamDest.stream.getAudioTracks()); } catch (e) {} }
+      const mixed = new MediaStream(tracks);
+      let mime = "video/mp4;codecs=avc1.42E01E,mp4a.40.2", ext = "mp4";
+      if (!MediaRecorder.isTypeSupported(mime)) { mime = MediaRecorder.isTypeSupported("video/mp4") ? "video/mp4" : "video/webm;codecs=vp9,opus"; ext = mime.indexOf("mp4") >= 0 ? "mp4" : "webm"; }
+      const rec = new MediaRecorder(mixed, { mimeType: mime, videoBitsPerSecond: 6000000 });
+      const chunks = []; rec.ondataavailable = (e) => { if (e.data.size) chunks.push(e.data); };
+      rec.onstop = () => {
+        const blob = new Blob(chunks, { type: ext === "mp4" ? "video/mp4" : "video/webm" });
+        const a = document.createElement("a"); a.href = URL.createObjectURL(blob); a.download = "valerian_sample." + ext; a.click();
+        btn.disabled = false; setStatus("Saved valerian_sample." + ext);
+      };
+      rec.start();
+      if (narrationReady) { try { sampleAudio.currentTime = 0; sampleAudio.play(); } catch (e) {} }
+      const begin = performance.now(); let fin = false;
+      function finish() { if (fin) return; fin = true; clearInterval(drv); if (narrationReady) { try { sampleAudio.pause(); } catch (e) {} } if (rec.state !== "inactive") rec.stop(); }
+      const drv = setInterval(() => { const et = (performance.now() - begin) / 1000; if (et >= total) { finish(); return; } draw(et); setHead(et); }, 1000 / fps);
+      setTimeout(finish, total * 1000 + 800);
+    });
+  })();
+  </script>
+</Layout>

@@ -1,0 +1,27 @@
+# dependencies
+node_modules/
+
+# build output
+dist/
+.astro/
+
+# environment files with real keys, never commit these
+.env
+.env.*
+!.env.example
+
+# worker data, outputs, and logs
+worker/input/
+worker/output/
+# rendered videos from the cloud automation (kept as run artifacts, not in git)
+/output/
+*.log
+
+# downloaded voice models for the local voice server
+voice-server/voices/
+
+# local ffmpeg binaries, not needed in the repo (the cloud runner has its own)
+worker/tools/
+
+# macOS
+.DS_Store

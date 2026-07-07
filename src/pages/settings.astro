@@ -1,0 +1,122 @@
+---
+import Layout from "../layouts/Layout.astro";
+import Icon from "../components/Icon.astro";
+import { channel } from "../data/demo.js";
+
+const plans = [
+  { name: "Starter", price: "Free", features: ["1 connected channel", "Basic analytics", "5 scheduled uploads"], active: false },
+  { name: "Pro", price: "$19 / month", features: ["3 connected channels", "Full analytics suite", "Unlimited scheduling", "Content Studio access"], active: true },
+  { name: "Studio", price: "$49 / month", features: ["10 connected channels", "Team seats", "Priority automation", "Custom reports"], active: false }
+];
+---
+<Layout title="Settings" subtitle="Manage your account, channel, and automation preferences" active="settings" page="Settings">
+
+  <section class="grid vstudio-cols" style="grid-template-columns: 260px minmax(0, 1fr); gap:18px; align-items:start;">
+    <!-- Settings nav -->
+    <div class="card" style="position:sticky; top:96px;">
+      <div class="card-body" style="padding:12px;">
+        <a href="#profile" class="nav-item active"><Icon name="users" size={18} />Channel profile</a>
+        <a href="#connection" class="nav-item"><Icon name="video" size={18} />Connection</a>
+        <a href="#appearance" class="nav-item"><Icon name="sparkles" size={18} />Appearance</a>
+        <a href="#billing" class="nav-item"><Icon name="cash" size={18} />Plan and billing</a>
+      </div>
+    </div>
+
+    <div style="display:flex; flex-direction:column; gap:18px;">
+      <!-- Profile -->
+      <div class="card" id="profile">
+        <div class="card-head"><div><h3>Channel profile</h3><p>How your channel appears across the suite</p></div></div>
+        <div class="card-body">
+          <div class="flex center gap-16" style="margin-bottom:22px;">
+            <div class="ph" style="width:64px;height:64px;border-radius:50%;background:linear-gradient(135deg,var(--violet),var(--cyan));display:grid;place-items:center;font-weight:800;font-size:22px;color:#fff;flex-shrink:0;">{channel.avatar}</div>
+            <div>
+              <div style="font-weight:700;font-size:16px;">{channel.name}</div>
+              <div class="faint" style="font-size:13px;">{channel.joined ? "Member since " + channel.joined : "Not connected yet"}</div>
+            </div>
+            <button class="btn sm" style="margin-left:auto;">Change photo</button>
+          </div>
+          <div class="grid g-2">
+            <div class="field"><label>Channel name</label><input class="input" id="stChannelName" placeholder="Your channel name" /></div>
+            <div class="field"><label>Handle</label><input class="input" id="stChannelHandle" placeholder="@yourhandle" /></div>
+          </div>
+          <div class="field"><label>Channel description</label><textarea class="textarea" placeholder="Tell viewers what your channel is about"></textarea></div>
+          <div class="flex gap-10"><button class="btn primary" id="saveProfile">Save changes</button><button class="btn ghost">Cancel</button></div>
+        </div>
+      </div>
+
+      <!-- Connection -->
+      <div class="card" id="connection">
+        <div class="card-head"><div><h3>Connection</h3><p>Link a YouTube channel for live data</p></div></div>
+        <div class="card-body">
+          <div class="flex center gap-16" style="background:var(--bg2);border:1px solid var(--border);border-radius:12px;padding:16px;">
+            <div class="ico red" style="width:44px;height:44px;border-radius:12px;flex-shrink:0;"><Icon name="video" size={22} /></div>
+            <div style="flex:1;">
+              <div style="font-weight:700;font-size:14px;">YouTube account</div>
+              <div class="faint" style="font-size:12.5px;">Currently running on demo data</div>
+            </div>
+            <span class="badge draft"><span class="d"></span>Not connected</span>
+            <button class="btn primary sm">Connect</button>
+          </div>
+          <p class="hint" style="margin-top:12px;">Connecting swaps the sample numbers for your real channel stats through the official YouTube data service.</p>
+        </div>
+      </div>
+
+      <!-- Appearance -->
+      <div class="card" id="appearance">
+        <div class="card-head"><div><h3>Appearance</h3><p>Personalize the look of your workspace</p></div></div>
+        <div class="card-body">
+          <div class="flex between center" style="padding:10px 0;">
+            <div><div style="font-weight:600;font-size:14px;">Light theme</div><div class="faint" style="font-size:12.5px;">Switch between the dark and light look</div></div>
+            <label class="switch"><input type="checkbox" id="themeSwitch" /><span class="track"></span></label>
+          </div>
+          <div class="flex between center" style="padding:10px 0;border-top:1px solid var(--border);">
+            <div><div style="font-weight:600;font-size:14px;">Compact tables</div><div class="faint" style="font-size:12.5px;">Fit more rows on each screen</div></div>
+            <label class="switch"><input type="checkbox" /><span class="track"></span></label>
+          </div>
+          <div class="flex between center" style="padding:10px 0;border-top:1px solid var(--border);">
+            <div><div style="font-weight:600;font-size:14px;">Email digests</div><div class="faint" style="font-size:12.5px;">Weekly performance summary in your inbox</div></div>
+            <label class="switch"><input type="checkbox" checked /><span class="track"></span></label>
+          </div>
+        </div>
+      </div>
+
+      <!-- Billing -->
+      <div class="card" id="billing">
+        <div class="card-head"><div><h3>Plan and billing</h3><p>Pick the plan that fits your channel</p></div></div>
+        <div class="card-body">
+          <div class="grid g-3">
+            {plans.map((p) => (
+              <div class="card pad" style={`border-color:${p.active ? "var(--violet)" : "var(--border)"}; ${p.active ? "box-shadow:inset 0 0 0 1px var(--violet);" : ""}`}>
+                <div class="flex between center" style="margin-bottom:6px;">
+                  <div style="font-weight:800;font-size:15px;">{p.name}</div>
+                  {p.active && <span class="badge scheduled"><span class="d"></span>Current</span>}
+                </div>
+                <div class="big-num" style="font-size:24px;margin-bottom:14px;">{p.price}</div>
+                <div style="display:flex;flex-direction:column;gap:9px;margin-bottom:16px;">
+                  {p.features.map((f) => (
+                    <div class="flex center gap-10" style="font-size:12.5px;"><span style="color:var(--green);display:grid;place-items:center;"><Icon name="check" size={15} /></span>{f}</div>
+                  ))}
+                </div>
+                <button class={`btn ${p.active ? "" : "primary"}`} style="width:100%;justify-content:center;" disabled={p.active}>{p.active ? "Active plan" : "Choose"}</button>
+              </div>
+            ))}
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <script is:inline>
+    // sync appearance toggle with the real theme
+    const sw = document.getElementById("themeSwitch");
+    if (sw) {
+      sw.checked = document.body.classList.contains("light");
+      sw.addEventListener("change", () => {
+        document.body.classList.toggle("light", sw.checked);
+        localStorage.setItem("cf-theme", sw.checked ? "light" : "dark");
+      });
+    }
+    const save = document.getElementById("saveProfile");
+    if (save) save.addEventListener("click", () => window.showToast("Profile saved"));
+  </script>
+</Layout>

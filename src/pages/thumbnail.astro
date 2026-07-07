@@ -1,0 +1,302 @@
+---
+import Layout from "../layouts/Layout.astro";
+import Icon from "../components/Icon.astro";
+---
+<Layout title="Thumbnail Studio" subtitle="Design covers that earn the click" active="thumbnail" page="Thumbnail Studio">
+
+  <section class="grid vstudio-cols" style="grid-template-columns: minmax(0, 1fr) 340px; gap:18px; align-items:start;">
+
+    <!-- Canvas -->
+    <div class="studio-left" style="display:flex; flex-direction:column; gap:16px; min-width:0;">
+      <div class="thumb-stage">
+        <canvas id="thumb" width="1280" height="720"></canvas>
+      </div>
+      <div class="flex gap-10">
+        <button class="btn primary" id="downloadPng"><Icon name="download" size={16} />Download PNG</button>
+        <button class="btn" id="genArt"><Icon name="robot" size={16} />Generate art background</button>
+        <button class="btn ghost" id="uploadPhoto"><Icon name="image" size={16} />Use my image</button>
+      </div>
+    </div>
+
+    <!-- Controls -->
+    <div style="display:flex; flex-direction:column; gap:16px;">
+      <div class="card">
+        <div class="card-head"><div><h3>Text</h3></div></div>
+        <div class="card-body">
+          <div class="field"><label>Headline</label><input class="input" id="headline" value="I TRIED IT FOR 30 DAYS" /></div>
+          <div class="field"><label>Badge</label><input class="input" id="badge" value="NEW" /></div>
+          <div class="field" style="margin-bottom:0;">
+            <label>Alignment</label>
+            <div class="seg" id="alignSeg">
+              <button data-a="left" class="on">Left</button>
+              <button data-a="center">Center</button>
+              <button data-a="right">Right</button>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="card-head"><div><h3>AI background</h3><p>Generate a real image</p></div></div>
+        <div class="card-body">
+          <div class="field"><label>Describe the scene</label><textarea class="textarea" id="aiPrompt" style="min-height:68px;">a cinematic mountain landscape at sunset, dramatic sky, ultra detailed</textarea></div>
+          <button class="btn primary" id="aiGen" style="width:100%;justify-content:center;"><Icon name="robot" size={16} />Generate with AI</button>
+          <p class="hint" id="aiHint" style="margin-top:8px;">Uses a keyless image model through your dev server.</p>
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="card-head"><div><h3>Background</h3></div></div>
+        <div class="card-body">
+          <label style="display:block;font-size:12.5px;font-weight:700;color:var(--muted);margin-bottom:8px;">Gradient presets</label>
+          <div class="swatches" id="bgSwatches"></div>
+          <label style="display:block;font-size:12.5px;font-weight:700;color:var(--muted);margin:16px 0 8px;">Text color</label>
+          <div class="swatches" id="textSwatches"></div>
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="card-head"><div><h3>Overlay strength</h3><p>Darken behind the text</p></div></div>
+        <div class="card-body">
+          <input class="range" id="overlay" type="range" min="0" max="80" value="35" />
+          <p class="hint" style="margin-top:8px;">Higher values keep the headline readable over busy images.</p>
+        </div>
+      </div>
+
+      <p class="hint" style="text-align:center;">Art backgrounds are generated on your device. Connect an image model later for photoreal results.</p>
+    </div>
+  </section>
+
+  <input type="file" id="photoInput" accept="image/*" style="display:none;" />
+
+  <script is:inline>
+  (function () {
+    const canvas = document.getElementById("thumb");
+    const ctx = canvas.getContext("2d");
+    const W = canvas.width, H = canvas.height;
+
+    const gradients = [
+      ["#ff2d55", "#7c5cff"], ["#7c5cff", "#22d3ee"], ["#0a0b12", "#7c5cff"],
+      ["#fbbf24", "#ff2d55"], ["#34d399", "#0a0b12"], ["#ff5e7d", "#fbbf24"],
+      ["#12152a", "#22d3ee"], ["#ff2d55", "#0a0b12"]
+    ];
+    const textColors = ["#ffffff", "#fbbf24", "#22d3ee", "#34d399", "#ff5e7d", "#0a0b12"];
+
+    const state = {
+      headline: "I TRIED IT FOR 30 DAYS",
+      badge: "NEW",
+      align: "left",
+      bg: gradients[0],
+      textColor: "#ffffff",
+      overlay: 0.35,
+      photo: null,
+      art: null
+    };
+
+    function roundRect(x, y, w, h, r) {
+      ctx.beginPath();
+      ctx.moveTo(x + r, y); ctx.arcTo(x + w, y, x + w, y + h, r);
+      ctx.arcTo(x + w, y + h, x, y + h, r); ctx.arcTo(x, y + h, x, y, r);
+      ctx.arcTo(x, y, x + w, y, r); ctx.closePath();
+    }
+
+    function drawBackground() {
+      if (state.photo) {
+        const img = state.photo;
+        const ir = img.width / img.height, cr = W / H;
+        let dw, dh;
+        if (ir > cr) { dh = H; dw = dh * ir; } else { dw = W; dh = dw / ir; }
+        ctx.drawImage(img, (W - dw) / 2, (H - dh) / 2, dw, dh);
+      } else if (state.art) {
+        const a = state.art;
+        const g = ctx.createLinearGradient(0, 0, W, H);
+        g.addColorStop(0, a.base[0]); g.addColorStop(1, a.base[1]);
+        ctx.fillStyle = g; ctx.fillRect(0, 0, W, H);
+        a.blobs.forEach((b) => {
+          const rg = ctx.createRadialGradient(b.x, b.y, 0, b.x, b.y, b.r);
+          rg.addColorStop(0, b.color + "cc"); rg.addColorStop(1, b.color + "00");
+          ctx.fillStyle = rg;
+          ctx.beginPath(); ctx.arc(b.x, b.y, b.r, 0, Math.PI * 2); ctx.fill();
+        });
+      } else {
+        const g = ctx.createLinearGradient(0, 0, W, H);
+        g.addColorStop(0, state.bg[0]); g.addColorStop(1, state.bg[1]);
+        ctx.fillStyle = g; ctx.fillRect(0, 0, W, H);
+      }
+      // readability overlay
+      if (state.overlay > 0) {
+        const og = ctx.createLinearGradient(0, H, 0, 0);
+        og.addColorStop(0, "rgba(0,0,0," + state.overlay + ")");
+        og.addColorStop(0.7, "rgba(0,0,0," + (state.overlay * 0.4) + ")");
+        og.addColorStop(1, "rgba(0,0,0,0)");
+        ctx.fillStyle = og; ctx.fillRect(0, 0, W, H);
+      }
+    }
+
+    function wrap(text, maxW, font) {
+      ctx.font = font;
+      const words = text.split(" ");
+      const lines = []; let line = "";
+      words.forEach((w) => {
+        const test = line ? line + " " + w : w;
+        if (ctx.measureText(test).width > maxW && line) { lines.push(line); line = w; }
+        else line = test;
+      });
+      if (line) lines.push(line);
+      return lines;
+    }
+
+    function drawText() {
+      const pad = 90;
+      const maxW = W - pad * 2;
+      const font = "800 108px Inter, sans-serif";
+      const lines = wrap(state.headline.toUpperCase(), maxW, font);
+      ctx.font = font;
+      ctx.textBaseline = "alphabetic";
+      const lh = 118;
+      let y = H - pad - (lines.length - 1) * lh;
+
+      let x = pad, align = "left";
+      if (state.align === "center") { x = W / 2; align = "center"; }
+      else if (state.align === "right") { x = W - pad; align = "right"; }
+      ctx.textAlign = align;
+
+      // badge above text
+      if (state.badge.trim()) {
+        ctx.font = "800 40px Inter, sans-serif";
+        const bt = state.badge.toUpperCase();
+        const bw = ctx.measureText(bt).width + 44;
+        let bx = pad;
+        if (state.align === "center") bx = W / 2 - bw / 2;
+        else if (state.align === "right") bx = W - pad - bw;
+        const by = y - lines.length * lh + 10;
+        ctx.fillStyle = "#ff2d55";
+        roundRect(bx, by - 46, bw, 58, 12); ctx.fill();
+        ctx.fillStyle = "#ffffff"; ctx.textAlign = "left";
+        ctx.fillText(bt, bx + 22, by - 6);
+        ctx.textAlign = align;
+      }
+
+      ctx.font = font;
+      lines.forEach((ln) => {
+        ctx.lineWidth = 12; ctx.strokeStyle = "rgba(0,0,0,.55)";
+        ctx.lineJoin = "round";
+        ctx.strokeText(ln, x, y);
+        ctx.fillStyle = state.textColor;
+        ctx.fillText(ln, x, y);
+        y += lh;
+      });
+    }
+
+    function render() {
+      ctx.clearRect(0, 0, W, H);
+      drawBackground();
+      drawText();
+    }
+
+    function makeArt() {
+      const base = gradients[Math.floor(Math.random() * gradients.length)];
+      const blobs = [];
+      const cols = ["#ff2d55", "#7c5cff", "#22d3ee", "#fbbf24", "#34d399", "#ff5e7d"];
+      const n = 5 + Math.floor(Math.random() * 4);
+      for (let i = 0; i < n; i++) {
+        blobs.push({
+          x: Math.random() * W, y: Math.random() * H,
+          r: 180 + Math.random() * 360,
+          color: cols[Math.floor(Math.random() * cols.length)]
+        });
+      }
+      state.art = { base, blobs };
+      state.photo = null;
+      render();
+    }
+
+    // build swatches
+    const bgWrap = document.getElementById("bgSwatches");
+    gradients.forEach((g, i) => {
+      const s = document.createElement("div");
+      s.className = "swatch" + (i === 0 ? " on" : "");
+      s.style.background = "linear-gradient(135deg," + g[0] + "," + g[1] + ")";
+      s.addEventListener("click", () => {
+        bgWrap.querySelectorAll(".swatch").forEach((n) => n.classList.remove("on"));
+        s.classList.add("on");
+        state.bg = g; state.art = null; state.photo = null; render();
+      });
+      bgWrap.appendChild(s);
+    });
+    const txtWrap = document.getElementById("textSwatches");
+    textColors.forEach((c, i) => {
+      const s = document.createElement("div");
+      s.className = "swatch" + (i === 0 ? " on" : "");
+      s.style.background = c;
+      s.addEventListener("click", () => {
+        txtWrap.querySelectorAll(".swatch").forEach((n) => n.classList.remove("on"));
+        s.classList.add("on");
+        state.textColor = c; render();
+      });
+      txtWrap.appendChild(s);
+    });
+
+    document.getElementById("headline").addEventListener("input", (e) => { state.headline = e.target.value; render(); });
+    document.getElementById("badge").addEventListener("input", (e) => { state.badge = e.target.value; render(); });
+    document.getElementById("overlay").addEventListener("input", (e) => { state.overlay = e.target.value / 100; render(); });
+    document.getElementById("alignSeg").addEventListener("click", (e) => {
+      const b = e.target.closest("button"); if (!b) return;
+      document.querySelectorAll("#alignSeg button").forEach((n) => n.classList.remove("on"));
+      b.classList.add("on"); state.align = b.getAttribute("data-a"); render();
+    });
+    document.getElementById("genArt").addEventListener("click", makeArt);
+
+    // Real AI image generation through the same origin dev proxy
+    const aiBtn = document.getElementById("aiGen");
+    const aiHint = document.getElementById("aiHint");
+    aiBtn.addEventListener("click", () => {
+      const prompt = (document.getElementById("aiPrompt").value || "").trim() || "cinematic thumbnail background";
+      const original = aiBtn.innerHTML;
+      aiBtn.disabled = true;
+      aiBtn.innerHTML = "Generating your image";
+      aiHint.textContent = "Contacting the image model, this can take a few seconds";
+      const seed = Math.floor(Math.random() * 100000);
+      const url = "/ai-image/" + encodeURIComponent(prompt) + "?width=1280&height=720&nologo=true&model=flux&seed=" + seed;
+      const img = new Image();
+      let done = false;
+      const to = setTimeout(() => { if (!done) { done = true; fail(); } }, 30000);
+      function restore() { aiBtn.disabled = false; aiBtn.innerHTML = original; }
+      function fail() {
+        clearTimeout(to); restore();
+        aiHint.textContent = "The model was unreachable, so a generated art background was used";
+        makeArt();
+        window.showToast("AI model unreachable, used generated art");
+      }
+      img.onload = () => {
+        if (done) return; done = true; clearTimeout(to);
+        state.photo = img; state.art = null;
+        restore(); aiHint.textContent = "Generated with AI. You can edit text and export as usual.";
+        render(); window.showToast("AI background generated");
+      };
+      img.onerror = () => { if (done) return; done = true; fail(); };
+      img.src = url;
+    });
+
+    const photoInput = document.getElementById("photoInput");
+    document.getElementById("uploadPhoto").addEventListener("click", () => photoInput.click());
+    photoInput.addEventListener("change", () => {
+      const f = photoInput.files[0]; if (!f) return;
+      const img = new Image();
+      img.onload = () => { state.photo = img; state.art = null; render(); window.showToast("Image added to thumbnail"); };
+      img.src = URL.createObjectURL(f);
+      photoInput.value = "";
+    });
+
+    document.getElementById("downloadPng").addEventListener("click", () => {
+      const a = document.createElement("a");
+      a.download = "creatorflow_thumbnail.png";
+      a.href = canvas.toDataURL("image/png");
+      a.click();
+      window.showToast("Thumbnail downloaded");
+    });
+
+    render();
+  })();
+  </script>
+</Layout>

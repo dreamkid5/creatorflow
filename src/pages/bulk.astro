@@ -1,0 +1,590 @@
+---
+import Layout from "../layouts/Layout.astro";
+import Icon from "../components/Icon.astro";
+---
+<Layout title="Bulk Studio" subtitle="Turn a batch of scripts into a set of finished videos" active="bulk" page="Bulk Studio">
+
+  <section class="grid vstudio-cols" style="grid-template-columns: minmax(0, 1fr) 340px; gap:18px; align-items:start;">
+
+    <!-- Main -->
+    <div style="display:flex; flex-direction:column; gap:18px;">
+
+      <!-- Input -->
+      <div class="card">
+        <div class="card-head">
+          <div><h3>Batch input</h3><p>One row per video</p></div>
+          <div class="actions">
+            <button class="btn sm ghost" id="templateBtn"><Icon name="download" size={14} />Template</button>
+            <button class="btn sm" id="csvBtn"><Icon name="upload" size={14} />Upload CSV</button>
+            <button class="btn sm ghost" id="sampleBtn">Sample</button>
+          </div>
+        </div>
+        <div class="card-body">
+          <div class="field" style="margin-bottom:12px;">
+            <label>Paste jobs, one per line as Title, then a vertical bar, then the script</label>
+            <textarea class="textarea" id="jobsText" style="min-height:120px;font-size:13px;" placeholder="The Story of Valerian | In ancient Rome a weary man could not sleep. Healers gave him valerian root. By dawn he slept deeply.
+Chamomile Through History | Egyptians honored chamomile as a gift of the sun. Monks grew it in stone gardens. Today it calms millions before sleep."></textarea>
+          </div>
+          <button class="btn" id="parseBtn" style="width:100%;justify-content:center;"><Icon name="plus" size={15} />Add to queue</button>
+          <p class="hint" style="margin-top:8px;">A CSV can use columns titled title, script, style, voice, and music. Each row becomes one video. Download the template to see the format.</p>
+        </div>
+      </div>
+
+      <!-- Queue -->
+      <div class="card">
+        <div class="card-head">
+          <div><h3>Render queue</h3><p id="queueCount">0 videos queued</p></div>
+          <div class="actions">
+            <button class="btn primary sm" id="startBtn"><Icon name="play" size={14} />Start batch</button>
+            <button class="btn sm" id="stopBtn" disabled><Icon name="stop" size={14} />Stop</button>
+            <button class="btn sm ghost" id="downloadAllBtn" disabled><Icon name="download" size={14} />Save all</button>
+          </div>
+        </div>
+        <div class="card-body" style="padding-top:8px;">
+          <div id="queueList"></div>
+          <div class="empty-note" id="queueEmpty">No videos in the queue yet. Add a batch above to begin.</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Right column -->
+    <div style="display:flex; flex-direction:column; gap:18px;">
+      <div class="card">
+        <div class="card-head"><div><h3>Now rendering</h3><p id="renderLabel">Idle</p></div></div>
+        <div class="card-body">
+          <div class="thumb-stage" style="aspect-ratio:16/9;"><canvas id="bulkCanvas" width="1280" height="720"></canvas></div>
+          <div class="bar" style="margin-top:12px;"><span id="batchFill" style="width:0%"></span></div>
+          <p class="hint" style="margin-top:8px;text-align:center;" id="batchStatus">Waiting to start</p>
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="card-head"><div><h3>Batch settings</h3></div></div>
+        <div class="card-body">
+          <div class="field" style="margin-bottom:12px;">
+            <label>Art style</label>
+            <select class="select" id="bulkStyle">
+              <option value="watercolor">Watercolor illustration</option>
+              <option value="cinematic">Cinematic photo</option>
+              <option value="storybook">Storybook painting</option>
+              <option value="anime">Anime</option>
+              <option value="3d">3D render</option>
+              <option value="flat">Flat vector</option>
+              <option value="oil">Oil painting</option>
+              <option value="pencil">Pencil sketch</option>
+              <option value="comic">Comic book</option>
+              <option value="papercut">Paper cut</option>
+              <option value="fantasy">Fantasy art</option>
+              <option value="vintage">Vintage photo</option>
+              <option value="pixel">Pixel art</option>
+              <option value="claymation">Claymation</option>
+              <option value="lineart">Line art</option>
+              <option value="synthwave">Synthwave neon</option>
+              <option value="folktale">African folktale</option>
+            </select>
+          </div>
+          <div class="field" style="margin-bottom:12px;">
+            <label>Seconds per scene <span class="faint" id="sceneLenVal">4s</span></label>
+            <input class="range" id="sceneLen" type="range" min="2" max="8" step="1" value="4" />
+          </div>
+          <label style="display:block;font-size:12.5px;font-weight:700;color:var(--muted);margin-bottom:8px;">Format</label>
+          <div class="seg" id="bulkFormat" style="margin-bottom:12px;">
+            <button data-fmt="mp4" class="on">MP4</button>
+            <button data-fmt="webm">WebM</button>
+          </div>
+          <button class="btn" id="musicBtn" style="width:100%;justify-content:center;"><Icon name="music" size={15} />Add shared music</button>
+          <div id="musicRow" style="display:none;align-items:center;gap:10px;margin-top:10px;">
+            <span class="status-dot ok"></span><span id="musicName" style="font-size:12px;font-weight:600;flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">music</span>
+            <button class="btn sm ghost" id="musicRemove" style="color:var(--rose);">Remove</button>
+          </div>
+          <p class="hint" style="margin-top:10px;">Each video gets a free natural voiceover that runs on your device, plus your shared music. No keys needed. The voice column picks the narrator, for example af_heart or bm_george.</p>
+        </div>
+      </div>
+
+      <!-- Watch folder -->
+      <div class="card" style="border-color:var(--violet);box-shadow:inset 0 0 0 1px var(--violet),var(--glow);">
+        <div class="card-head"><div><h3>Watch folder</h3><p>Drop a CSV, get videos</p></div></div>
+        <div class="card-body">
+          <button class="btn primary" id="watchBtn" style="width:100%;justify-content:center;"><Icon name="folder" size={16} />Choose watch folder</button>
+          <div id="watchInfo" style="display:none;align-items:center;gap:10px;margin-top:12px;">
+            <span class="status-dot ok"></span>
+            <span style="font-size:12.5px;font-weight:600;flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">Watching <span id="watchName">folder</span></span>
+            <button class="btn sm ghost" id="watchStop" style="color:var(--rose);">Stop</button>
+          </div>
+          <div class="field" style="margin:14px 0 10px;">
+            <label>Check every</label>
+            <select class="select" id="watchInterval">
+              <option value="15">15 seconds</option>
+              <option value="30" selected>30 seconds</option>
+              <option value="60">1 minute</option>
+              <option value="300">5 minutes</option>
+            </select>
+          </div>
+          <label class="flex center gap-10" style="font-size:13px;cursor:pointer;">
+            <input type="checkbox" id="autoRun" checked style="width:17px;height:17px;accent-color:var(--violet);" />
+            Build and save automatically
+          </label>
+          <p class="hint" id="watchHint" style="margin-top:10px;">Pick a folder. Every new CSV in it becomes videos, saved to an output folder inside it. Works in Chrome and Edge while this tab stays open.</p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <canvas id="offCanvas" width="1280" height="720" style="display:none;"></canvas>
+  <audio id="jobAudioEl" style="display:none;"></audio>
+  <audio id="bulkMusicEl" loop style="display:none;"></audio>
+  <input type="file" id="csvInput" accept=".csv,text/csv,text/plain" style="display:none;" />
+  <input type="file" id="musicInput" accept="audio/*" style="display:none;" />
+
+  <script is:inline>
+  (function () {
+    const canvas = document.getElementById("bulkCanvas");
+    const ctx = canvas.getContext("2d");
+    const W = canvas.width, H = canvas.height;
+
+    const styleKW = {
+      watercolor: "storybook illustration, clean bold ink outlines, flat soft watercolor fills, warm vivid palette, gentle cel shading, cream paper background with loose watercolor edges, editorial childrens book art, crisp and detailed, not photorealistic",
+      cinematic: "cinematic photograph, dramatic lighting, film still, highly detailed, 35mm",
+      storybook: "storybook painting, warm, painterly, whimsical",
+      anime: "anime style, cel shaded, vibrant, detailed background",
+      "3d": "3d render, soft studio lighting, subsurface scattering, pixar style",
+      flat: "flat vector illustration, minimal, bold shapes, clean",
+      oil: "oil painting, rich impasto brushstrokes, classical, textured canvas, warm light",
+      pencil: "detailed pencil sketch, graphite shading, cross hatching, monochrome, hand drawn",
+      comic: "comic book illustration, bold ink outlines, halftone dots, dynamic, vibrant colors",
+      papercut: "layered paper cut art, soft drop shadows, tactile, handcrafted, clean edges",
+      fantasy: "epic fantasy concept art, luminous atmosphere, highly detailed digital painting",
+      vintage: "vintage photograph, faded film grain, nostalgic, sepia and muted tones",
+      pixel: "pixel art, 16 bit retro game style, crisp pixels, limited palette",
+      claymation: "claymation, plasticine clay model, stop motion, soft studio light",
+      lineart: "elegant line art, minimal single weight lines, clean white background",
+      synthwave: "synthwave retro futuristic, neon glow, purple and cyan, 1980s aesthetic",
+      folktale: "African folktale illustration, rich earth tones, bold tribal patterns, Ndebele and Kente inspired motifs, warm ochre and indigo palette, textured, storytelling art"
+    };
+
+    let jobs = [];
+    let running = false, stopFlag = false;
+    let sceneLen = 4, format = "mp4";
+    let music = null;
+    const jobAudioEl = document.getElementById("jobAudioEl");
+    const bulkMusicEl = document.getElementById("bulkMusicEl");
+    let musicVol = 0.4;
+    const KOKORO_VOICES = ["af_heart", "af_bella", "af_nicole", "af_sarah", "am_michael", "am_adam", "am_echo", "bf_emma", "bf_isabella", "bm_george", "bm_lewis"];
+
+    // ---------- input parsing ----------
+    function parseCSV(text) {
+      const rows = []; let row = [], field = "", inQ = false;
+      for (let i = 0; i < text.length; i++) {
+        const c = text[i];
+        if (inQ) { if (c === '"') { if (text[i + 1] === '"') { field += '"'; i++; } else inQ = false; } else field += c; }
+        else {
+          if (c === '"') inQ = true;
+          else if (c === ",") { row.push(field); field = ""; }
+          else if (c === "\n" || c === "\r") { if (c === "\r" && text[i + 1] === "\n") i++; row.push(field); rows.push(row); row = []; field = ""; }
+          else field += c;
+        }
+      }
+      if (field.length || row.length) { row.push(field); rows.push(row); }
+      return rows.filter((r) => r.some((f) => f.trim()));
+    }
+
+    function jobsFromCSV(text) {
+      const rows = parseCSV(text);
+      if (!rows.length) return [];
+      let start = 0, ti = 0, si = 1, sti = 2, vi = -1, mi = -1;
+      const first = rows[0].map((f) => f.trim().toLowerCase());
+      if (first.indexOf("script") >= 0) {
+        ti = first.indexOf("title"); si = first.indexOf("script"); sti = first.indexOf("style");
+        vi = first.indexOf("voice"); mi = first.indexOf("music");
+        if (ti < 0) ti = 0;
+        start = 1;
+      }
+      const out = [];
+      for (let i = start; i < rows.length; i++) {
+        const r = rows[i];
+        const script = (r[si] || "").trim();
+        if (!script) continue;
+        out.push({
+          title: (r[ti] || ("Video " + (out.length + 1))).trim(),
+          script: script,
+          style: (sti >= 0 && r[sti] ? r[sti].trim() : ""),
+          voice: (vi >= 0 && r[vi] ? r[vi].trim() : ""),
+          music: (mi >= 0 && r[mi] ? r[mi].trim() : "")
+        });
+      }
+      return out;
+    }
+
+    function jobsFromPaste(text) {
+      return text.split("\n").map((l) => l.trim()).filter(Boolean).map((line, i) => {
+        const bar = line.indexOf("|");
+        if (bar >= 0) return { title: line.slice(0, bar).trim() || ("Video " + (i + 1)), script: line.slice(bar + 1).trim(), style: "", voice: "", music: "" };
+        return { title: "Video " + (i + 1), script: line, style: "", voice: "", music: "" };
+      }).filter((j) => j.script);
+    }
+
+    function splitScript(text) {
+      text = text.trim().replace(/[ \t]+/g, " ");
+      let parts = text.split(/\n\s*\n/).map((s) => s.trim().replace(/\n/g, " ")).filter(Boolean);
+      if (parts.length < 2) {
+        const sentences = text.replace(/\n/g, " ").match(/[^.!?]+[.!?]+/g);
+        if (sentences && sentences.length > 1) parts = sentences.map((s) => s.trim()).filter(Boolean);
+      }
+      const MAX = 10;
+      if (parts.length > MAX) {
+        const grouped = [], per = Math.ceil(parts.length / MAX);
+        for (let i = 0; i < parts.length; i += per) grouped.push(parts.slice(i, i + per).join(" "));
+        parts = grouped;
+      }
+      return parts;
+    }
+
+    // ---------- queue UI ----------
+    const queueList = document.getElementById("queueList");
+    function renderQueue() {
+      document.getElementById("queueEmpty").style.display = jobs.length ? "none" : "block";
+      document.getElementById("queueCount").textContent = jobs.length + (jobs.length === 1 ? " video queued" : " videos queued");
+      queueList.innerHTML = jobs.map((j, i) => (
+        '<div class="render-row" data-i="' + i + '">' +
+          '<div class="ico ' + (j.status === "Done" ? "green" : j.status === "Failed" ? "red" : "violet") + '" style="width:34px;height:34px;border-radius:9px;flex-shrink:0;">' +
+            '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><rect x="2.5" y="4" width="19" height="16" rx="2.5"/><path d="M10 9l6 3-6 3z"/></svg></div>' +
+          '<div style="flex:1;min-width:0;">' +
+            '<div style="font-weight:600;font-size:13px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">' + esc(j.title) + '</div>' +
+            '<div class="bar" style="margin-top:6px;"><span style="width:' + Math.round((j.progress || 0) * 100) + '%"></span></div>' +
+          '</div>' +
+          '<div style="text-align:right;flex-shrink:0;min-width:96px;">' +
+            (j.url
+              ? '<a class="btn sm primary" href="' + j.url + '" download="creatorflow_' + slug(j.title) + '.' + (j.ext || "mp4") + '">Save</a>'
+              : '<span class="badge ' + statusBadge(j.status) + '"><span class="d"></span>' + j.status + '</span>') +
+          '</div>' +
+        '</div>'
+      )).join("");
+    }
+    function esc(s) { return String(s).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;"); }
+    function slug(s) { return s.toLowerCase().replace(/[^a-z0-9]+/g, "_").replace(/^_|_$/g, "").slice(0, 40) || "video"; }
+    function statusBadge(s) { return s === "Done" ? "published" : s === "Failed" ? "draft" : s === "Queued" ? "draft" : "scheduled"; }
+    function setJob(i, patch) { Object.assign(jobs[i], patch); renderQueue(); }
+
+    // ---------- image generation ----------
+    function loadOneImage(prompt, style, seed) {
+      return new Promise((resolve) => {
+        const full = prompt + ", " + (styleKW[style] || styleKW.watercolor);
+        const url = "/ai-image/" + encodeURIComponent(full) + "?width=1280&height=720&nologo=true&model=flux&seed=" + seed;
+        const img = new Image();
+        img.onload = () => resolve(img);
+        img.onerror = () => resolve(null);
+        img.src = url;
+      });
+    }
+    // Retry a few times so an occasional image hiccup does not fail the job
+    async function genImage(prompt, style, seed, onRetry) {
+      for (let attempt = 0; attempt < 3; attempt++) {
+        const img = await loadOneImage(prompt, style, seed + attempt * 1000);
+        if (img) return img;
+        if (attempt < 2) { if (onRetry) onRetry(attempt + 2); await new Promise((r) => setTimeout(r, 1500)); }
+      }
+      return null;
+    }
+
+    // ---------- narration (best effort, needs provider key) ----------
+    let audioGraph = null, voiceSrc = null, musicSrc = null, musicGain = null;
+    function ensureGraph() {
+      if (audioGraph) return audioGraph;
+      const ac = new (window.AudioContext || window.webkitAudioContext)();
+      const dest = ac.createMediaStreamDestination();
+      voiceSrc = ac.createMediaElementSource(jobAudioEl);
+      voiceSrc.connect(dest);
+      musicSrc = ac.createMediaElementSource(bulkMusicEl);
+      musicGain = ac.createGain(); musicGain.gain.value = musicVol;
+      musicSrc.connect(musicGain); musicGain.connect(dest);
+      audioGraph = { ac, dest };
+      return audioGraph;
+    }
+    // load a per row music url or the shared track into the music element
+    let sharedMusicUrl = null;
+    function setMusicSource(url) {
+      return new Promise((res) => {
+        if (!url) { res(false); return; }
+        if (bulkMusicEl.src === url) { res(true); return; }
+        bulkMusicEl.src = url;
+        bulkMusicEl.onloadedmetadata = () => res(true);
+        bulkMusicEl.onerror = () => res(false);
+      });
+    }
+    async function loadJobMusic(url) {
+      try {
+        const r = await fetch(url);
+        if (!r.ok) return false;
+        const ct = r.headers.get("content-type") || "";
+        if (ct.indexOf("audio") < 0 && !/\.(mp3|m4a|ogg|wav)($|\?)/i.test(url)) return false;
+        const blob = await r.blob();
+        return await setMusicSource(URL.createObjectURL(blob));
+      } catch (e) { return false; }
+    }
+
+    // ---------- draw one frame of a job ----------
+    function drawFrame(imgs, durations, t) {
+      ctx.fillStyle = "#05060a"; ctx.fillRect(0, 0, W, H);
+      let acc = 0, i = 0, lt = 0;
+      for (i = 0; i < imgs.length; i++) { if (t < acc + durations[i] || i === imgs.length - 1) { lt = t - acc; break; } acc += durations[i]; }
+      if (i >= imgs.length) i = imgs.length - 1;
+      const dur = durations[i];
+      lt = Math.max(0, Math.min(lt, dur));
+      const TR = 0.6, p = Math.min(1, lt / TR);
+      function cover(img, alpha, scale) {
+        ctx.save(); ctx.globalAlpha = alpha;
+        const ir = img.width / img.height, cr = W / H; let dw, dh;
+        if (ir > cr) { dh = H * scale; dw = dh * ir; } else { dw = W * scale; dh = dw / ir; }
+        ctx.drawImage(img, (W - dw) / 2, (H - dh) / 2, dw, dh);
+        ctx.restore();
+      }
+      const scale = 1 + 0.09 * (lt / dur); // gentle Ken Burns on every scene
+      if (i > 0 && lt < TR) { cover(imgs[i - 1], 1, 1 + 0.09); cover(imgs[i], p, scale); }
+      else if (i === 0 && lt < TR) { cover(imgs[i], 1, scale); ctx.save(); ctx.globalAlpha = 1 - p; ctx.fillStyle = "#000"; ctx.fillRect(0, 0, W, H); ctx.restore(); }
+      else { cover(imgs[i], 1, scale); }
+    }
+
+    // ---------- render a job to a video file ----------
+    function pickMime() {
+      let mime = "", ext = "webm";
+      if (format === "mp4") {
+        const m = "video/mp4;codecs=avc1.42E01E,mp4a.40.2";
+        if (MediaRecorder.isTypeSupported(m)) { mime = m; ext = "mp4"; }
+        else if (MediaRecorder.isTypeSupported("video/mp4")) { mime = "video/mp4"; ext = "mp4"; }
+      }
+      if (!mime) { mime = MediaRecorder.isTypeSupported("video/webm;codecs=vp9,opus") ? "video/webm;codecs=vp9,opus" : "video/webm"; ext = "webm"; }
+      return { mime, ext };
+    }
+
+    function renderVideo(imgs, narrationDur, useMusic, idx) {
+      return new Promise((resolve) => {
+        const useVoice = narrationDur != null;
+        const total = useVoice ? Math.max(narrationDur, imgs.length * 2) : imgs.length * sceneLen;
+        const durations = imgs.map(() => total / imgs.length);
+        const stream = canvas.captureStream(30);
+        let tracks = stream.getVideoTracks();
+        if (useVoice || useMusic) { const g = ensureGraph(); if (g.ac.state === "suspended") g.ac.resume(); tracks = tracks.concat(g.dest.stream.getAudioTracks()); }
+        const mixed = new MediaStream(tracks);
+        const { mime, ext } = pickMime();
+        const rec = new MediaRecorder(mixed, { mimeType: mime, videoBitsPerSecond: 6000000 });
+        const chunks = [];
+        rec.ondataavailable = (e) => { if (e.data.size) chunks.push(e.data); };
+        rec.onstop = () => { const blob = new Blob(chunks, { type: ext === "mp4" ? "video/mp4" : "video/webm" }); resolve({ url: URL.createObjectURL(blob), ext: ext, size: blob.size, blob: blob }); };
+        rec.start();
+        if (useVoice) { try { jobAudioEl.currentTime = 0; jobAudioEl.play(); } catch (e) {} }
+        if (useMusic) { try { bulkMusicEl.currentTime = 0; bulkMusicEl.volume = musicVol; bulkMusicEl.play(); } catch (e) {} }
+        const begin = performance.now();
+        let done = false;
+        function finish() { if (done) return; done = true; clearInterval(drv); if (useVoice) jobAudioEl.pause(); if (useMusic) bulkMusicEl.pause(); if (rec.state !== "inactive") rec.stop(); }
+        const drv = setInterval(() => {
+          const et = (performance.now() - begin) / 1000;
+          if (et >= total) { finish(); return; }
+          drawFrame(imgs, durations, et);
+          setJob(idx, { progress: 0.5 + 0.5 * (et / total) });
+          document.getElementById("batchFill").style.width = Math.min(100, (et / total) * 100) + "%";
+        }, 1000 / 30);
+        setTimeout(finish, total * 1000 + 800);
+      });
+    }
+
+    // ---------- batch runner ----------
+    async function runBatch() {
+      if (running) return;
+      const pending = jobs.filter((j) => !j.url && j.status !== "Done");
+      if (!pending.length) { window.showToast("Add some videos to the queue first"); return; }
+      running = true; stopFlag = false;
+      document.getElementById("startBtn").disabled = true;
+      document.getElementById("stopBtn").disabled = false;
+      for (let i = 0; i < jobs.length; i++) {
+        if (stopFlag) break;
+        const job = jobs[i];
+        if (job.url) continue;
+        document.getElementById("renderLabel").textContent = job.title;
+        const scenes = splitScript(job.script);
+        const style = job.style && styleKW[job.style] ? job.style : document.getElementById("bulkStyle").value;
+        const imgs = [];
+        for (let s = 0; s < scenes.length; s++) {
+          if (stopFlag) break;
+          setJob(i, { status: "Scene " + (s + 1) + "/" + scenes.length, progress: (s / scenes.length) * 0.5 });
+          document.getElementById("batchStatus").textContent = job.title + ": generating scene " + (s + 1) + " of " + scenes.length;
+          const img = await genImage(scenes[s], style, 3000 + i * 100 + s * 7, (n) => {
+            document.getElementById("batchStatus").textContent = job.title + ": retrying scene " + (s + 1) + ", attempt " + n;
+          });
+          if (img) imgs.push(img);
+        }
+        if (stopFlag) break;
+        if (!imgs.length) { setJob(i, { status: "Failed" }); continue; }
+        // free natural narration that runs on the device
+        let narrationDur = null;
+        try {
+          setJob(i, { status: "Narrating" });
+          document.getElementById("batchStatus").textContent = job.title + ": generating the natural voice";
+          const mod = await import("/natural-voice.js");
+          const voice = KOKORO_VOICES.indexOf((job.voice || "").toLowerCase()) >= 0 ? job.voice.toLowerCase() : "af_heart";
+          const blob = await mod.synthesize(job.script, voice, (p) => { document.getElementById("batchStatus").textContent = job.title + ": voice model " + p + "%"; });
+          await new Promise((res) => { jobAudioEl.src = URL.createObjectURL(blob); jobAudioEl.onloadedmetadata = () => res(); jobAudioEl.onerror = () => res(); });
+          if (isFinite(jobAudioEl.duration) && jobAudioEl.duration > 0) narrationDur = jobAudioEl.duration;
+        } catch (e) { narrationDur = null; }
+
+        setJob(i, { status: "Rendering" });
+        document.getElementById("batchStatus").textContent = job.title + ": rendering video";
+        let useMusic = false;
+        if (job.music) useMusic = await loadJobMusic(job.music);
+        if (!useMusic && sharedMusicUrl) useMusic = await setMusicSource(sharedMusicUrl);
+        const out = await renderVideo(imgs, narrationDur, useMusic, i);
+        setJob(i, { status: "Done", url: out.url, ext: out.ext, blob: out.blob, progress: 1 });
+      }
+      running = false;
+      document.getElementById("startBtn").disabled = false;
+      document.getElementById("stopBtn").disabled = true;
+      const doneCount = jobs.filter((j) => j.url).length;
+      document.getElementById("downloadAllBtn").disabled = doneCount === 0;
+      document.getElementById("renderLabel").textContent = "Idle";
+      document.getElementById("batchStatus").textContent = stopFlag ? "Batch stopped" : "Batch complete";
+      document.getElementById("batchFill").style.width = "0%";
+      window.showToast(stopFlag ? "Batch stopped" : (doneCount + " video(s) ready"));
+    }
+
+    // ---------- wire controls ----------
+    function toJob(j) { return { title: j.title, script: j.script, style: j.style, voice: j.voice || "", music: j.music || "", status: "Queued", progress: 0 }; }
+
+    document.getElementById("templateBtn").addEventListener("click", () => {
+      const csv = "title,script,style,voice,music\n" +
+        '"The Story of Valerian","In ancient Rome a weary man could not sleep. Healers gave him valerian root to calm his mind. By dawn he slept deeply.",watercolor,bm_george,\n' +
+        '"Chamomile Through History","Egyptians honored chamomile as a gift of the sun. Monks grew it in stone gardens. Today it calms millions before sleep.",storybook,af_heart,\n';
+      const a = document.createElement("a");
+      a.href = URL.createObjectURL(new Blob([csv], { type: "text/csv" }));
+      a.download = "creatorflow_batch_template.csv"; a.click();
+      window.showToast("CSV template downloaded");
+    });
+
+    document.getElementById("parseBtn").addEventListener("click", () => {
+      const text = document.getElementById("jobsText").value.trim();
+      if (!text) { window.showToast("Paste some jobs first"); return; }
+      const added = jobsFromPaste(text).map(toJob);
+      jobs = jobs.concat(added); renderQueue();
+      window.showToast(added.length + " video(s) added to the queue");
+    });
+    document.getElementById("sampleBtn").addEventListener("click", () => {
+      document.getElementById("jobsText").value =
+        "The Story of Valerian | In ancient Rome a weary man could not sleep by candlelight. Healers gave him valerian root to calm his restless mind. By dawn the herb eased him into deep peaceful sleep.\n" +
+        "Chamomile Through History | Ancient Egyptians honored chamomile as a gift of the sun. Medieval monks grew it in quiet stone gardens. Today it calms millions of people before sleep.";
+    });
+    document.getElementById("csvBtn").addEventListener("click", () => document.getElementById("csvInput").click());
+    document.getElementById("csvInput").addEventListener("change", (e) => {
+      const f = e.target.files[0]; if (!f) return;
+      const reader = new FileReader();
+      reader.onload = () => {
+        const added = jobsFromCSV(reader.result).map(toJob);
+        jobs = jobs.concat(added); renderQueue();
+        window.showToast(added.length + " video(s) added from CSV");
+      };
+      reader.readAsText(f);
+      e.target.value = "";
+    });
+
+    document.getElementById("startBtn").addEventListener("click", runBatch);
+    document.getElementById("stopBtn").addEventListener("click", () => { stopFlag = true; window.showToast("Stopping after this step"); });
+    document.getElementById("downloadAllBtn").addEventListener("click", () => {
+      const done = jobs.filter((j) => j.url);
+      done.forEach((j, k) => setTimeout(() => {
+        const a = document.createElement("a"); a.href = j.url; a.download = "creatorflow_" + slug(j.title) + "." + (j.ext || "mp4"); a.click();
+      }, k * 400));
+      window.showToast("Saving " + done.length + " video(s)");
+    });
+
+    document.getElementById("sceneLen").addEventListener("input", (e) => { sceneLen = parseInt(e.target.value, 10); document.getElementById("sceneLenVal").textContent = sceneLen + "s"; });
+    document.getElementById("bulkFormat").addEventListener("click", (e) => { const b = e.target.closest("button"); if (!b) return; document.querySelectorAll("#bulkFormat button").forEach((n) => n.classList.remove("on")); b.classList.add("on"); format = b.getAttribute("data-fmt"); });
+
+    document.getElementById("musicBtn").addEventListener("click", () => document.getElementById("musicInput").click());
+    document.getElementById("musicInput").addEventListener("change", (e) => {
+      const f = e.target.files[0]; if (!f) return;
+      sharedMusicUrl = URL.createObjectURL(f);
+      bulkMusicEl.src = sharedMusicUrl; bulkMusicEl.load(); music = { name: f.name };
+      document.getElementById("musicName").textContent = f.name;
+      document.getElementById("musicRow").style.display = "flex";
+      window.showToast("Shared music added");
+      e.target.value = "";
+    });
+    document.getElementById("musicRemove").addEventListener("click", () => { music = null; sharedMusicUrl = null; bulkMusicEl.pause(); document.getElementById("musicRow").style.display = "none"; window.showToast("Music removed"); });
+
+    // ---------- watch folder and schedule ----------
+    let dirHandle = null, watchTimer = null, watchBusy = false, watchInterval = 30;
+    const processed = new Set();
+    const canWatch = ("showDirectoryPicker" in window);
+    if (!canWatch) {
+      document.getElementById("watchBtn").disabled = true;
+      document.getElementById("watchHint").textContent = "This browser does not support folder watching. Use Upload CSV instead. Desktop Chrome or Edge supports it.";
+    }
+
+    document.getElementById("watchInterval").addEventListener("change", (e) => { watchInterval = parseInt(e.target.value, 10); if (watchTimer) startWatch(); });
+
+    document.getElementById("watchBtn").addEventListener("click", async () => {
+      try { dirHandle = await window.showDirectoryPicker(); }
+      catch (e) { return; }
+      document.getElementById("watchInfo").style.display = "flex";
+      document.getElementById("watchName").textContent = dirHandle.name;
+      document.getElementById("watchBtn").style.display = "none";
+      startWatch();
+      window.showToast("Watching " + dirHandle.name);
+      pollFolder();
+    });
+    document.getElementById("watchStop").addEventListener("click", stopWatch);
+
+    function startWatch() { clearInterval(watchTimer); watchTimer = setInterval(pollFolder, watchInterval * 1000); setWatchStatus(); }
+    function stopWatch() {
+      clearInterval(watchTimer); watchTimer = null; dirHandle = null;
+      document.getElementById("watchInfo").style.display = "none";
+      document.getElementById("watchBtn").style.display = "";
+      document.getElementById("batchStatus").textContent = "Folder watch stopped";
+      window.showToast("Stopped watching the folder");
+    }
+    function setWatchStatus() { if (watchTimer && !watchBusy) document.getElementById("batchStatus").textContent = "Watching " + (dirHandle ? dirHandle.name : "") + ", checking every " + watchInterval + "s"; }
+
+    async function pollFolder() {
+      if (!dirHandle || watchBusy) return;
+      watchBusy = true;
+      try {
+        const found = [];
+        for await (const entry of dirHandle.values()) {
+          if (entry.kind === "file" && /\.csv$/i.test(entry.name) && !processed.has(entry.name)) found.push(entry);
+        }
+        for (const handle of found) {
+          processed.add(handle.name);
+          const file = await handle.getFile();
+          const text = await file.text();
+          const added = jobsFromCSV(text).map(toJob);
+          if (!added.length) continue;
+          jobs = jobs.concat(added); renderQueue();
+          document.getElementById("batchStatus").textContent = "Found " + handle.name + ", building " + added.length + " video(s)";
+          if (document.getElementById("autoRun").checked) { await runBatch(); await writeOutputs(); }
+        }
+      } catch (e) { document.getElementById("batchStatus").textContent = "Watch error, will retry on the next check"; }
+      watchBusy = false;
+      setWatchStatus();
+    }
+
+    async function writeOutputs() {
+      if (!dirHandle) return;
+      try {
+        const outDir = await dirHandle.getDirectoryHandle("output", { create: true });
+        let saved = 0;
+        for (const j of jobs) {
+          if (j.blob && !j.saved) {
+            const fh = await outDir.getFileHandle("creatorflow_" + slug(j.title) + "." + (j.ext || "mp4"), { create: true });
+            const w = await fh.createWritable(); await w.write(j.blob); await w.close();
+            j.saved = true; saved++;
+          }
+        }
+        if (saved) window.showToast(saved + " video(s) saved to the output folder");
+      } catch (e) {}
+    }
+
+    // idle canvas
+    ctx.fillStyle = "#05060a"; ctx.fillRect(0, 0, W, H);
+    ctx.fillStyle = "#6b7299"; ctx.font = "600 34px Inter, sans-serif"; ctx.textAlign = "center"; ctx.textBaseline = "middle";
+    ctx.fillText("Batch preview", W / 2, H / 2);
+    renderQueue();
+  })();
+  </script>
+</Layout>

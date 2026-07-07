@@ -1,0 +1,207 @@
+---
+import Layout from "../layouts/Layout.astro";
+import Icon from "../components/Icon.astro";
+import { automations, automationTemplates, automationRuns, triggerOptions, actionOptions } from "../data/demo.js";
+
+const triggerLabel = (k) => (triggerOptions.find((t) => t.key === k) || {}).label || k;
+const actionLabel = (k) => (actionOptions.find((a) => a.key === k) || {}).label || k;
+
+const activeCount = automations.filter((a) => a.on).length;
+const totalRuns = automations.reduce((s, a) => s + a.runs, 0);
+
+const chevron = '<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 6l6 6-6 6"/></svg>';
+---
+<Layout title="Automations" subtitle="Put your channel on autopilot with triggers and actions" active="automations" page="Automations">
+
+  <!-- Stats -->
+  <section class="grid g-3" style="margin-bottom:22px;">
+    <div class="card pad">
+      <div class="flex center gap-10" style="margin-bottom:10px;"><div class="ico violet" style="width:38px;height:38px;border-radius:11px;"><Icon name="sliders" size={18} /></div><div class="label muted" style="font-size:12.5px;font-weight:600;">Active automations</div></div>
+      <div class="big-num" id="activeStat">{activeCount}</div>
+    </div>
+    <div class="card pad">
+      <div class="flex center gap-10" style="margin-bottom:10px;"><div class="ico cyan" style="width:38px;height:38px;border-radius:11px;"><Icon name="refresh" size={18} /></div><div class="label muted" style="font-size:12.5px;font-weight:600;">Tasks automated</div></div>
+      <div class="big-num">{totalRuns.toLocaleString()}</div>
+    </div>
+    <div class="card pad">
+      <div class="flex center gap-10" style="margin-bottom:10px;"><div class="ico green" style="width:38px;height:38px;border-radius:11px;"><Icon name="clock" size={18} /></div><div class="label muted" style="font-size:12.5px;font-weight:600;">Hours saved</div></div>
+      <div class="big-num">0</div>
+    </div>
+  </section>
+
+  <section class="grid vstudio-cols" style="grid-template-columns: minmax(0, 1fr) 340px; gap:18px; align-items:start;">
+    <div style="display:flex; flex-direction:column; gap:18px;">
+
+      <!-- Active automations -->
+      <div class="card">
+        <div class="card-head"><div><h3>Your automations</h3><p>Recipes running on your channel</p></div></div>
+        <div class="card-body">
+          <div id="autList">
+            {automations.length === 0 && (
+              <div class="empty-note" id="autEmpty">No automations yet. Use a template on the right, or build one below.</div>
+            )}
+            {automations.map((a, i) => (
+              <div class="aut-card" data-id={i} data-on={a.on ? "1" : "0"}>
+                <div class="aut-ico"><Icon name="sliders" size={20} /></div>
+                <div style="flex:1; min-width:0;">
+                  <div style="font-weight:700; font-size:15px;">{a.name}</div>
+                  <div class="faint" style="font-size:12.5px; margin-bottom:2px;">{a.desc}</div>
+                  <div class="flow">
+                    <span class="node trigger"><Icon name="target" size={13} />When {triggerLabel(a.trigger)}</span>
+                    {a.actions.map((ac) => (
+                      <>
+                        <span class="arrow" set:html={chevron}></span>
+                        <span class="node action">{actionLabel(ac)}</span>
+                      </>
+                    ))}
+                  </div>
+                </div>
+                <div style="text-align:right; flex-shrink:0;">
+                  <label class="switch"><input type="checkbox" checked={a.on} class="aut-toggle" /><span class="track"></span></label>
+                  <div class="faint" style="font-size:11.5px; margin-top:8px;">{a.runs} runs</div>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      </div>
+
+      <!-- Build your own -->
+      <div class="card">
+        <div class="card-head"><div><h3>Build an automation</h3><p>Pick a trigger, then one or more actions</p></div></div>
+        <div class="card-body">
+          <div class="field"><label>Name</label><input class="input" id="bName" placeholder="For example, Weekly upload autopilot" /></div>
+          <div class="field">
+            <label>When this happens</label>
+            <select class="select" id="bTrigger">
+              {triggerOptions.map((t) => <option value={t.key}>{t.label}</option>)}
+            </select>
+          </div>
+          <label style="display:block;font-size:12.5px;font-weight:700;color:var(--muted);margin-bottom:10px;">Do these actions</label>
+          <div style="display:grid; grid-template-columns:1fr 1fr; gap:10px; margin-bottom:16px;">
+            {actionOptions.map((a) => (
+              <label class="flex center gap-10" style="font-size:13px; cursor:pointer;">
+                <input type="checkbox" class="b-action" value={a.key} style="width:17px;height:17px;accent-color:var(--violet);" />
+                {a.label}
+              </label>
+            ))}
+          </div>
+          <button class="btn primary" id="bCreate" style="width:100%; justify-content:center;"><Icon name="plus" size={16} />Create automation</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Right column -->
+    <div style="display:flex; flex-direction:column; gap:18px;">
+      <!-- Templates -->
+      <div class="card">
+        <div class="card-head"><div><h3>Templates</h3><p>Start in one click</p></div></div>
+        <div class="card-body" style="padding-top:8px;">
+          {automationTemplates.map((t, i) => (
+            <div class="flex between center" style={`padding:13px 0;${i ? "border-top:1px solid var(--border);" : ""}`}>
+              <div style="min-width:0; padding-right:10px;">
+                <div style="font-weight:600; font-size:13.5px;">{t.name}</div>
+                <div class="faint" style="font-size:12px;">{t.desc}</div>
+              </div>
+              <button class="btn sm use-template"
+                data-name={t.name}
+                data-desc={t.desc}
+                data-trigger={t.trigger}
+                data-actions={t.actions.join(",")}>Use</button>
+            </div>
+          ))}
+        </div>
+      </div>
+
+      <!-- Run log -->
+      <div class="card">
+        <div class="card-head"><div><h3>Recent runs</h3><p>What autopilot has done</p></div></div>
+        <div class="card-body" style="padding-top:8px;">
+          {automationRuns.length ? automationRuns.map((r) => (
+            <div class="run-line">
+              <span class="status-dot" style={`background:${r.status === "ok" ? "var(--green)" : "var(--amber)"};flex-shrink:0;`}></span>
+              <span style="flex:1;">{r.text}</span>
+              <span class="t" style="width:auto;">{r.time}</span>
+            </div>
+          )) : (
+            <div class="empty-note">No runs yet.</div>
+          )}
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <script id="autOpts" type="application/json" is:inline set:html={JSON.stringify({ triggers: triggerOptions, actions: actionOptions })}></script>
+
+  <script is:inline>
+    const OPTS = JSON.parse(document.getElementById("autOpts").textContent);
+    const tLabel = (k) => (OPTS.triggers.find((t) => t.key === k) || {}).label || k;
+    const aLabel = (k) => (OPTS.actions.find((a) => a.key === k) || {}).label || k;
+    const CHEV = '<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 6l6 6-6 6"/></svg>';
+    const list = document.getElementById("autList");
+
+    function esc(s) { return String(s).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;"); }
+
+    function updateActiveStat() {
+      const n = list.querySelectorAll('.aut-card[data-on="1"]').length;
+      document.getElementById("activeStat").textContent = n;
+    }
+
+    function buildCard(name, desc, trigger, actions, on) {
+      const nodes = actions.map((ac) => `<span class="arrow">${CHEV}</span><span class="node action">${esc(aLabel(ac))}</span>`).join("");
+      const card = document.createElement("div");
+      card.className = "aut-card";
+      card.setAttribute("data-on", on ? "1" : "0");
+      card.innerHTML =
+        `<div class="aut-ico"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M4 21v-7M4 10V3M12 21v-9M12 8V3M20 21v-5M20 12V3M1 14h6M9 8h6M17 16h6"/></svg></div>` +
+        `<div style="flex:1; min-width:0;">` +
+          `<div style="font-weight:700; font-size:15px;">${esc(name)}</div>` +
+          `<div class="faint" style="font-size:12.5px; margin-bottom:2px;">${esc(desc)}</div>` +
+          `<div class="flow"><span class="node trigger"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9"><circle cx="12" cy="12" r="9"/><circle cx="12" cy="12" r="5"/><circle cx="12" cy="12" r="1.5"/></svg>When ${esc(tLabel(trigger))}</span>${nodes}</div>` +
+        `</div>` +
+        `<div style="text-align:right; flex-shrink:0;">` +
+          `<label class="switch"><input type="checkbox" ${on ? "checked" : ""} class="aut-toggle"><span class="track"></span></label>` +
+          `<div class="faint" style="font-size:11.5px; margin-top:8px;">new</div>` +
+        `</div>`;
+      return card;
+    }
+
+    // toggles
+    list.addEventListener("change", (e) => {
+      const t = e.target.closest(".aut-toggle");
+      if (t) {
+        const card = t.closest(".aut-card");
+        card.setAttribute("data-on", t.checked ? "1" : "0");
+        updateActiveStat();
+        window.showToast(t.checked ? "Automation turned on" : "Automation paused");
+      }
+    });
+
+    // build
+    document.getElementById("bCreate").addEventListener("click", () => {
+      const name = (document.getElementById("bName").value || "").trim();
+      const trigger = document.getElementById("bTrigger").value;
+      const actions = Array.from(document.querySelectorAll(".b-action:checked")).map((c) => c.value);
+      if (!name) { window.showToast("Give your automation a name"); return; }
+      if (!actions.length) { window.showToast("Pick at least one action"); return; }
+      list.insertBefore(buildCard(name, "Custom automation you built", trigger, actions, true), list.firstChild);
+      updateActiveStat();
+      document.getElementById("bName").value = "";
+      document.querySelectorAll(".b-action:checked").forEach((c) => c.checked = false);
+      window.showToast("Automation created and turned on");
+    });
+
+    // templates
+    document.querySelectorAll(".use-template").forEach((btn) => {
+      btn.addEventListener("click", () => {
+        const name = btn.getAttribute("data-name");
+        const desc = btn.getAttribute("data-desc");
+        const trigger = btn.getAttribute("data-trigger");
+        const actions = btn.getAttribute("data-actions").split(",");
+        list.insertBefore(buildCard(name, desc, trigger, actions, true), list.firstChild);
+        updateActiveStat();
+        window.showToast("Template added to your automations");
+      });
+    });
+  </script>
+</Layout>

@@ -1,0 +1,628 @@
+---
+import Layout from "../layouts/Layout.astro";
+import Icon from "../components/Icon.astro";
+---
+<Layout title="Cartoon Studio" subtitle="Animate a friendly mascot and export it to video" active="cartoon" page="Cartoon Studio">
+
+  <section class="grid vstudio-cols" style="grid-template-columns: minmax(0, 1fr) 340px; gap:18px; align-items:start;">
+
+    <!-- Stage -->
+    <div class="studio-left" style="display:flex; flex-direction:column; gap:16px; min-width:0;">
+      <div class="card pad">
+        <div class="studio-stage"><canvas id="toon" width="1280" height="720"></canvas></div>
+        <div class="transport">
+          <button class="play-btn" id="playBtn" aria-label="Play"><Icon name="pause" size={20} /></button>
+          <span class="muted" style="font-size:13px; font-weight:600;">Looping animation</span>
+          <div style="margin-left:auto; display:flex; gap:10px;">
+            <button class="btn sm" id="waveBtn"><Icon name="star" size={15} />Wave</button>
+            <button class="btn sm" id="jumpBtn"><Icon name="up" size={15} />Jump</button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Controls -->
+    <div style="display:flex; flex-direction:column; gap:16px;">
+
+      <div class="card">
+        <div class="card-head"><div><h3>Character</h3><p>Pick a color</p></div></div>
+        <div class="card-body">
+          <div class="swatches" id="charSwatches"></div>
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="card-head"><div><h3>Scene</h3><p>Choose a background</p></div></div>
+        <div class="card-body">
+          <div class="seg" id="themeSeg">
+            <button data-theme="day" class="on">Day</button>
+            <button data-theme="sunset">Sunset</button>
+            <button data-theme="night">Night</button>
+            <button data-theme="studio">Studio</button>
+          </div>
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="card-head"><div><h3>Speech bubble</h3><p>What the mascot says</p></div></div>
+        <div class="card-body">
+          <input class="input" id="speechText" type="text" value="Let's create!" maxlength="22" />
+          <label class="flex center gap-10" style="font-size:13px; margin-top:12px; cursor:pointer;">
+            <input type="checkbox" id="speechOn" checked style="width:17px;height:17px;accent-color:var(--violet);" />
+            Show the speech bubble
+          </label>
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="card-head"><div><h3>Voiceover and lip sync</h3><p>The mouth follows the audio</p></div></div>
+        <div class="card-body">
+          <div class="flex gap-10">
+            <button class="btn" id="voiceUpload" style="flex:1;justify-content:center;"><Icon name="upload" size={15} />Add audio</button>
+            <button class="btn" id="voiceRec" style="flex:1;justify-content:center;"><Icon name="mic" size={15} />Record</button>
+          </div>
+          <div id="voiceInfo" style="display:none;align-items:center;gap:10px;margin-top:12px;">
+            <span class="status-dot ok"></span>
+            <span id="voiceName" style="font-size:12.5px;font-weight:600;flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">voiceover</span>
+            <button class="btn sm ghost" id="voiceRemove" style="color:var(--rose);">Remove</button>
+          </div>
+          <div id="recStatus" style="display:none;align-items:center;gap:10px;margin-top:12px;">
+            <span class="rec-dot"></span><span class="time" id="recTime" style="font-size:14px;">0:00</span>
+            <span class="faint" style="font-size:12px;">Recording</span>
+          </div>
+          <p class="hint" style="margin-top:10px;">Add a voiceover and the mascot mouth moves in time with it. The audio is included in the export.</p>
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="card-head"><div><h3>Second character</h3><p>Add a companion</p></div></div>
+        <div class="card-body">
+          <label class="flex center gap-10" style="font-size:13px;cursor:pointer;">
+            <input type="checkbox" id="twoChars" style="width:17px;height:17px;accent-color:var(--violet);" />
+            Show a second character
+          </label>
+          <div id="char2Wrap" style="display:none;margin-top:14px;">
+            <label style="display:block;font-size:12.5px;font-weight:700;color:var(--muted);margin-bottom:8px;">Second color</label>
+            <div class="swatches" id="charSwatches2"></div>
+          </div>
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="card-head"><div><h3>Export</h3><p>Save your animation</p></div></div>
+        <div class="card-body">
+          <label style="display:block;font-size:12.5px;font-weight:700;color:var(--muted);margin-bottom:8px;">Format</label>
+          <div class="seg" id="formatSeg" style="margin-bottom:12px;">
+            <button data-fmt="mp4" class="on">MP4</button>
+            <button data-fmt="webm">WebM</button>
+          </div>
+          <label style="display:block;font-size:12.5px;font-weight:700;color:var(--muted);margin-bottom:8px;">Length <span class="faint" id="lenVal">8s</span></label>
+          <input class="range" id="lenRange" type="range" min="4" max="30" step="1" value="8" style="margin-bottom:14px;" />
+          <button class="btn primary" id="exportBtn" style="width:100%;justify-content:center;"><Icon name="download" size={16} />Export animation</button>
+          <button class="btn" id="pngBtn" style="width:100%;justify-content:center;margin-top:10px;"><Icon name="image" size={15} />Save current frame</button>
+          <div id="exportProg" style="display:none;margin-top:12px;">
+            <div class="bar"><span id="exportFill" style="width:0%"></span></div>
+            <p class="hint" style="margin-top:6px;text-align:center;" id="exportLabel">Recording your animation</p>
+          </div>
+          <div id="renderHistory" style="margin-top:12px;"></div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <audio id="voiceEl" style="display:none;"></audio>
+  <input type="file" id="voiceInput" accept="audio/*" style="display:none;" />
+
+  <script is:inline>
+  (function () {
+    const canvas = document.getElementById("toon");
+    const ctx = canvas.getContext("2d");
+    const W = canvas.width, H = canvas.height;
+
+    const charColors = [
+      ["#ff5e7d", "#7c5cff"], ["#22d3ee", "#34d399"], ["#fbbf24", "#ff5e7d"],
+      ["#a78bff", "#22d3ee"], ["#34d399", "#0ea5a0"], ["#ff2d55", "#ff9a3c"]
+    ];
+    const themes = {
+      day:    { sky: ["#7cc7ff", "#dff6ff"], orb: "#ffe36b", orbGlow: "#fff3a8", ground: "#88df6e", ground2: "#63cf57", night: false },
+      sunset: { sky: ["#ff9a76", "#ffd6a5"], orb: "#ff7a45", orbGlow: "#ffd0a0", ground: "#e08a52", ground2: "#c9733f", night: false },
+      night:  { sky: ["#141a3a", "#3a2a6b"], orb: "#eaf0ff", orbGlow: "#c9d4ff", ground: "#2a2350", ground2: "#201a42", night: true },
+      studio: { sky: ["#12152a", "#222741"], orb: "#7c5cff", orbGlow: "#a78bff", ground: "#1a1e30", ground2: "#141726", night: true }
+    };
+
+    const state = {
+      color: charColors[0],
+      color2: charColors[3],
+      twoChars: false,
+      theme: "day",
+      speech: "Let's create!",
+      speechOn: true,
+      len: 8,
+      format: "mp4"
+    };
+
+    let playing = true, raf = null, lastNow = performance.now(), animTime = 0;
+    let jumpStart = null, waveUntil = 0, exporting = false;
+
+    // voiceover and lip sync
+    const voiceEl = document.getElementById("voiceEl");
+    let audioCtx = null, analyser = null, dataArr = null, voiceSrc = null, streamDest = null;
+    let mouthLevel = 0, voiceLoaded = false, voicePlaying = false;
+
+    function sampleLevel() {
+      if (analyser && voicePlaying) {
+        analyser.getByteTimeDomainData(dataArr);
+        let sum = 0;
+        for (let i = 0; i < dataArr.length; i++) { const v = (dataArr[i] - 128) / 128; sum += v * v; }
+        const rms = Math.sqrt(sum / dataArr.length);
+        const target = Math.min(1, rms * 5.5);
+        mouthLevel += (target - mouthLevel) * 0.5;
+      } else {
+        mouthLevel *= 0.6;
+      }
+    }
+
+    function setupVoice(url, name) {
+      voiceEl.src = url; voiceEl.loop = true;
+      if (!audioCtx) {
+        audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+        voiceSrc = audioCtx.createMediaElementSource(voiceEl);
+        analyser = audioCtx.createAnalyser();
+        analyser.fftSize = 1024;
+        dataArr = new Uint8Array(analyser.fftSize);
+        streamDest = audioCtx.createMediaStreamDestination();
+        voiceSrc.connect(analyser); analyser.connect(audioCtx.destination);
+        voiceSrc.connect(streamDest);
+      }
+      voiceLoaded = true;
+      voiceEl.onloadedmetadata = () => {
+        if (isFinite(voiceEl.duration) && voiceEl.duration > 0) {
+          state.len = Math.min(30, Math.max(4, Math.ceil(voiceEl.duration)));
+          document.getElementById("lenRange").value = state.len;
+          document.getElementById("lenVal").textContent = state.len + "s";
+        }
+      };
+      document.getElementById("voiceInfo").style.display = "flex";
+      document.getElementById("voiceName").textContent = name || "voiceover";
+      if (playing) { if (audioCtx.resume) audioCtx.resume(); try { voiceEl.currentTime = 0; voiceEl.play(); voicePlaying = true; } catch (e) {} }
+      window.showToast("Voiceover added, lip sync is on");
+    }
+
+    // reusable helpers
+    function roundRect(x, y, w, h, r) {
+      ctx.beginPath();
+      ctx.moveTo(x + r, y);
+      ctx.arcTo(x + w, y, x + w, y + h, r);
+      ctx.arcTo(x + w, y + h, x, y + h, r);
+      ctx.arcTo(x, y + h, x, y, r);
+      ctx.arcTo(x, y, x + w, y, r);
+      ctx.closePath();
+    }
+    function circle(x, y, r) { ctx.beginPath(); ctx.arc(x, y, r, 0, Math.PI * 2); ctx.closePath(); }
+
+    // deterministic star field for night
+    const stars = [];
+    for (let i = 0; i < 70; i++) stars.push({ x: (i * 97.3) % W, y: (i * 53.7) % (H * 0.6), r: (i % 3) * 0.7 + 0.6, tw: (i % 5) });
+
+    // floating emoji particles
+    const emojis = ["❤️", "⭐", "👍", "🔔", "✨"];
+
+    function drawBackground(t) {
+      const th = themes[state.theme];
+      const g = ctx.createLinearGradient(0, 0, 0, H);
+      g.addColorStop(0, th.sky[0]); g.addColorStop(1, th.sky[1]);
+      ctx.fillStyle = g; ctx.fillRect(0, 0, W, H);
+
+      // stars at night
+      if (th.night) {
+        for (const s of stars) {
+          const a = 0.4 + 0.6 * Math.abs(Math.sin(t * 1.5 + s.tw));
+          ctx.globalAlpha = a; ctx.fillStyle = "#ffffff";
+          circle(s.x, s.y, s.r); ctx.fill();
+        }
+        ctx.globalAlpha = 1;
+      }
+
+      // sun or moon, gently bobbing
+      const ox = 1010, oy = 180 + Math.sin(t * 0.6) * 8;
+      const glow = ctx.createRadialGradient(ox, oy, 10, ox, oy, 150);
+      glow.addColorStop(0, th.orbGlow); glow.addColorStop(1, th.orbGlow + "00");
+      ctx.fillStyle = glow; circle(ox, oy, 150); ctx.fill();
+      ctx.fillStyle = th.orb; circle(ox, oy, 66); ctx.fill();
+
+      // drifting clouds (skip for studio)
+      if (state.theme !== "studio") {
+        const cloudColor = th.night ? "rgba(255,255,255,.16)" : "rgba(255,255,255,.9)";
+        drawCloud(((t * 26) % (W + 360)) - 200, 150, 1.1, cloudColor);
+        drawCloud(((t * 18 + 500) % (W + 360)) - 200, 250, 0.8, cloudColor);
+        drawCloud(((t * 22 + 900) % (W + 360)) - 200, 110, 0.65, cloudColor);
+      }
+
+      // ground hill
+      ctx.fillStyle = th.ground;
+      ctx.beginPath();
+      ctx.moveTo(0, H);
+      ctx.lineTo(0, 560);
+      ctx.quadraticCurveTo(W / 2, 470, W, 560);
+      ctx.lineTo(W, H); ctx.closePath(); ctx.fill();
+      ctx.fillStyle = th.ground2;
+      ctx.beginPath();
+      ctx.moveTo(0, H); ctx.lineTo(0, 620);
+      ctx.quadraticCurveTo(W / 2, 560, W, 620);
+      ctx.lineTo(W, H); ctx.closePath(); ctx.fill();
+    }
+
+    function drawCloud(x, y, s, color) {
+      ctx.fillStyle = color;
+      circle(x, y, 34 * s); ctx.fill();
+      circle(x + 40 * s, y - 14 * s, 42 * s); ctx.fill();
+      circle(x + 86 * s, y, 34 * s); ctx.fill();
+      roundRect(x - 6 * s, y, 100 * s, 34 * s, 20 * s); ctx.fill();
+    }
+
+    function drawParticles(t) {
+      for (let i = 0; i < 9; i++) {
+        const phase = (t * 0.16 + i / 9) % 1;
+        const x = 180 + ((i * 137) % 940) + Math.sin(t * 1.2 + i) * 26;
+        const y = 620 - phase * 560;
+        const alpha = Math.sin(phase * Math.PI);
+        ctx.globalAlpha = alpha * 0.9;
+        ctx.font = (30 + (i % 3) * 8) + "px serif";
+        ctx.textAlign = "center"; ctx.textBaseline = "middle";
+        ctx.fillText(emojis[i % emojis.length], x, y);
+      }
+      ctx.globalAlpha = 1;
+    }
+
+    function drawCharacter(t, cx, cyBase, colorPair, scale, opts) {
+      opts = opts || {};
+      const tb = t + (opts.phase || 0);
+      const bob = Math.sin(tb * 2) * 10;
+      let jump = 0;
+      if (opts.primary && jumpStart !== null) {
+        const e = t - jumpStart;
+        if (e >= 0 && e < 0.7) jump = Math.sin((e / 0.7) * Math.PI) * 105;
+        else jumpStart = null;
+      }
+      const cy = cyBase + bob - jump;
+      const bw = 128, bh = 150;
+      const c1 = colorPair[0], c2 = colorPair[1];
+
+      // shadow
+      ctx.save();
+      ctx.globalAlpha = (0.22 - jump / 900);
+      ctx.fillStyle = "#000";
+      ctx.beginPath();
+      ctx.ellipse(cx, cyBase + bh * scale + 42, (118 - jump * 0.4) * scale, (26 - jump * 0.06) * scale, 0, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.restore();
+
+      ctx.save();
+      ctx.translate(cx, cy);
+      ctx.scale(scale, scale);
+      ctx.rotate(Math.sin(tb * 2) * 0.03 + (opts.nod ? Math.sin(t * 2.4) * 0.05 : 0));
+      const bs = 1 + Math.sin(tb * 2) * 0.02;
+      ctx.scale(bs, 2 - bs);
+
+      // feet
+      ctx.fillStyle = c2;
+      ctx.beginPath(); ctx.ellipse(-52, bh - 6, 34, 22, 0, 0, Math.PI * 2); ctx.fill();
+      ctx.beginPath(); ctx.ellipse(52, bh - 6, 34, 22, 0, 0, Math.PI * 2); ctx.fill();
+
+      // arms (capsules). the primary character can wave
+      const waving = opts.primary && t < waveUntil;
+      function arm(shoulderX, shoulderY, angle) {
+        const len = 96;
+        const hx = shoulderX + Math.cos(angle) * len;
+        const hy = shoulderY + Math.sin(angle) * len;
+        ctx.strokeStyle = c1; ctx.lineWidth = 30; ctx.lineCap = "round";
+        ctx.beginPath(); ctx.moveTo(shoulderX, shoulderY); ctx.lineTo(hx, hy); ctx.stroke();
+        ctx.fillStyle = c2; circle(hx, hy, 20); ctx.fill();
+      }
+      const leftAngle = 2.5 + Math.sin(tb * 2) * 0.06;
+      const rightAngle = waving ? (-1.15 + Math.sin(t * 12) * 0.45) : (0.7 + Math.sin(tb * 2 + 1) * 0.06);
+      arm(-bw + 8, -34, leftAngle);
+      arm(bw - 8, -34, rightAngle);
+
+      // body
+      const bg = ctx.createLinearGradient(0, -bh, 0, bh);
+      bg.addColorStop(0, c1); bg.addColorStop(1, c2);
+      ctx.fillStyle = bg;
+      roundRect(-bw, -bh, bw * 2, bh * 2, 78); ctx.fill();
+
+      // gloss
+      ctx.globalAlpha = 0.16; ctx.fillStyle = "#fff";
+      ctx.beginPath(); ctx.ellipse(-46, -78, 58, 40, -0.5, 0, Math.PI * 2); ctx.fill();
+      ctx.globalAlpha = 1;
+
+      // antenna with glowing bulb
+      ctx.strokeStyle = c1; ctx.lineWidth = 8; ctx.lineCap = "round";
+      ctx.beginPath(); ctx.moveTo(0, -bh); ctx.lineTo(0, -bh - 40); ctx.stroke();
+      const pulse = 0.6 + 0.4 * Math.abs(Math.sin(t * 3 + (opts.phase || 0)));
+      const bulbGlow = ctx.createRadialGradient(0, -bh - 52, 2, 0, -bh - 52, 34);
+      bulbGlow.addColorStop(0, "rgba(255,214,102," + pulse + ")");
+      bulbGlow.addColorStop(1, "rgba(255,214,102,0)");
+      ctx.fillStyle = bulbGlow; circle(0, -bh - 52, 34); ctx.fill();
+      ctx.fillStyle = "#ffd666"; circle(0, -bh - 52, 13); ctx.fill();
+
+      // face blink and look
+      const cyc = tb % 3.4;
+      let eyeOpen = 1;
+      if (cyc > 3.2) eyeOpen = Math.abs(((cyc - 3.2) / 0.2) - 0.5) * 2;
+      const look = (opts.facing ? opts.facing : Math.sin(tb * 0.7)) * 9;
+      for (const ex of [-48, 48]) {
+        ctx.fillStyle = "#ffffff";
+        ctx.beginPath(); ctx.ellipse(ex, -44, 33, 40 * eyeOpen + 2, 0, 0, Math.PI * 2); ctx.fill();
+        if (eyeOpen > 0.25) {
+          ctx.fillStyle = "#241f3a";
+          circle(ex + look, -40, 15); ctx.fill();
+          ctx.fillStyle = "#fff";
+          circle(ex + look + 5, -46, 5); ctx.fill();
+        }
+      }
+
+      // cheeks
+      ctx.globalAlpha = 0.45; ctx.fillStyle = "#ff6b96";
+      circle(-74, 4, 15); ctx.fill(); circle(74, 4, 15); ctx.fill();
+      ctx.globalAlpha = 1;
+
+      // mouth: lip sync for the speaker, otherwise a smile
+      let mouthAmt = -1;
+      if (opts.speaker) {
+        if (voiceLoaded) mouthAmt = mouthLevel;
+        else if (state.speechOn && (t % 6) < 2.2) mouthAmt = 0.35 + 0.45 * Math.abs(Math.sin(t * 9));
+      }
+      ctx.fillStyle = "#241f3a";
+      if (mouthAmt >= 0) {
+        const open = 5 + mouthAmt * 21;
+        ctx.beginPath(); ctx.ellipse(0, 34, 19, open, 0, 0, Math.PI * 2); ctx.fill();
+      } else {
+        ctx.strokeStyle = "#241f3a"; ctx.lineWidth = 7; ctx.lineCap = "round";
+        ctx.beginPath(); ctx.arc(0, 22, 26, 0.15 * Math.PI, 0.85 * Math.PI); ctx.stroke();
+      }
+      ctx.restore();
+
+      // speech bubble for the speaker
+      if (opts.speaker && state.speechOn && (t % 6) < 2.4 && state.speech.trim()) {
+        drawBubble(cx + 130 * scale, cy - bh * scale - 6, state.speech.trim());
+      }
+    }
+
+    function drawBubble(x, y, text) {
+      ctx.font = "700 34px Inter, sans-serif";
+      ctx.textAlign = "left"; ctx.textBaseline = "middle";
+      const tw = ctx.measureText(text).width;
+      const pad = 26, bw = tw + pad * 2, bh = 68;
+      ctx.fillStyle = "#ffffff";
+      roundRect(x, y - bh / 2, bw, bh, 20); ctx.fill();
+      // tail
+      ctx.beginPath(); ctx.moveTo(x + 24, y + bh / 2 - 6);
+      ctx.lineTo(x + 6, y + bh / 2 + 26); ctx.lineTo(x + 52, y + bh / 2 - 6);
+      ctx.closePath(); ctx.fill();
+      ctx.fillStyle = "#241f3a";
+      ctx.fillText(text, x + pad, y);
+    }
+
+    function draw(t) {
+      sampleLevel();
+      drawBackground(t);
+      drawParticles(t);
+      if (state.twoChars) {
+        drawCharacter(t, 430, 450, state.color, 0.82, { primary: true, speaker: true, phase: 0 });
+        drawCharacter(t, 850, 450, state.color2, 0.82, { primary: false, speaker: false, phase: 1.4, nod: true, facing: -1 });
+      } else {
+        drawCharacter(t, 560, 430, state.color, 1, { primary: true, speaker: true, phase: 0 });
+      }
+    }
+
+    // ---------- loop ----------
+    const playBtn = document.getElementById("playBtn");
+    function frame(now) {
+      const dt = (now - lastNow) / 1000; lastNow = now;
+      if (exporting) { raf = requestAnimationFrame(frame); return; }
+      if (playing) animTime += dt;
+      draw(animTime);
+      raf = requestAnimationFrame(frame);
+    }
+    function setPlay(on) {
+      playing = on;
+      lastNow = performance.now();
+      playBtn.innerHTML = on
+        ? '<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round"><path d="M8 5v14M16 5v14"/></svg>'
+        : '<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round"><path d="M6 4l14 8-14 8z"/></svg>';
+      if (voiceLoaded && !exporting) {
+        if (on) { if (audioCtx && audioCtx.resume) audioCtx.resume(); try { voiceEl.play(); } catch (e) {} voicePlaying = true; }
+        else { voiceEl.pause(); voicePlaying = false; }
+      }
+    }
+    playBtn.addEventListener("click", () => setPlay(!playing));
+    document.getElementById("waveBtn").addEventListener("click", () => { waveUntil = animTime + 2.2; });
+    document.getElementById("jumpBtn").addEventListener("click", () => { jumpStart = animTime; });
+
+    // ---------- controls ----------
+    const cs = document.getElementById("charSwatches");
+    charColors.forEach((c, i) => {
+      const s = document.createElement("div");
+      s.className = "swatch" + (i === 0 ? " on" : "");
+      s.style.background = "linear-gradient(135deg," + c[0] + "," + c[1] + ")";
+      s.addEventListener("click", () => {
+        cs.querySelectorAll(".swatch").forEach((n) => n.classList.remove("on"));
+        s.classList.add("on"); state.color = c;
+      });
+      cs.appendChild(s);
+    });
+    // second character color swatches
+    const cs2 = document.getElementById("charSwatches2");
+    charColors.forEach((c, i) => {
+      const s = document.createElement("div");
+      s.className = "swatch" + (c === state.color2 ? " on" : "");
+      s.style.background = "linear-gradient(135deg," + c[0] + "," + c[1] + ")";
+      s.addEventListener("click", () => {
+        cs2.querySelectorAll(".swatch").forEach((n) => n.classList.remove("on"));
+        s.classList.add("on"); state.color2 = c;
+      });
+      cs2.appendChild(s);
+    });
+    document.getElementById("twoChars").addEventListener("change", (e) => {
+      state.twoChars = e.target.checked;
+      document.getElementById("char2Wrap").style.display = e.target.checked ? "block" : "none";
+    });
+
+    document.getElementById("themeSeg").addEventListener("click", (e) => {
+      const b = e.target.closest("button"); if (!b) return;
+      document.querySelectorAll("#themeSeg button").forEach((n) => n.classList.remove("on"));
+      b.classList.add("on"); state.theme = b.getAttribute("data-theme");
+    });
+
+    // voiceover controls
+    const voiceInput = document.getElementById("voiceInput");
+    document.getElementById("voiceUpload").addEventListener("click", () => voiceInput.click());
+    voiceInput.addEventListener("change", () => {
+      const f = voiceInput.files[0]; if (!f) return;
+      setupVoice(URL.createObjectURL(f), f.name);
+      voiceInput.value = "";
+    });
+    document.getElementById("voiceRemove").addEventListener("click", () => {
+      voiceEl.pause(); voicePlaying = false; voiceLoaded = false; mouthLevel = 0;
+      voiceEl.removeAttribute("src");
+      document.getElementById("voiceInfo").style.display = "none";
+      window.showToast("Voiceover removed");
+    });
+
+    // voiceover recorder
+    let mediaRec = null, recChunks = [], recording = false, recTimer = null, recStart = 0, recStream = null;
+    const recBtn = document.getElementById("voiceRec");
+    recBtn.addEventListener("click", async () => {
+      if (recording) { try { mediaRec.stop(); } catch (e) {} return; }
+      if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) { window.showToast("Recording is not supported in this browser"); return; }
+      try { recStream = await navigator.mediaDevices.getUserMedia({ audio: true }); }
+      catch (e) { window.showToast("Microphone permission was declined"); return; }
+      recChunks = [];
+      let rmime = "audio/webm";
+      if (!MediaRecorder.isTypeSupported(rmime)) rmime = "";
+      mediaRec = rmime ? new MediaRecorder(recStream, { mimeType: rmime }) : new MediaRecorder(recStream);
+      mediaRec.ondataavailable = (e) => { if (e.data.size) recChunks.push(e.data); };
+      mediaRec.onstop = () => {
+        recording = false; clearInterval(recTimer);
+        recBtn.innerHTML = '<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="2" width="6" height="12" rx="3"/><path d="M5 10a7 7 0 0 0 14 0M12 19v3"/></svg> Record';
+        recBtn.classList.remove("primary");
+        document.getElementById("recStatus").style.display = "none";
+        if (recStream) recStream.getTracks().forEach((t) => t.stop());
+        const blob = new Blob(recChunks, { type: "audio/webm" });
+        setupVoice(URL.createObjectURL(blob), "voiceover recording");
+      };
+      mediaRec.start(); recording = true; recStart = performance.now();
+      recBtn.innerHTML = '<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><rect x="6" y="6" width="12" height="12" rx="2"/></svg> Stop';
+      recBtn.classList.add("primary");
+      document.getElementById("recStatus").style.display = "flex";
+      document.getElementById("recTime").textContent = "0:00";
+      recTimer = setInterval(() => {
+        const s = Math.floor((performance.now() - recStart) / 1000);
+        document.getElementById("recTime").textContent = (Math.floor(s / 60)) + ":" + (s % 60 < 10 ? "0" : "") + (s % 60);
+      }, 250);
+    });
+    document.getElementById("speechText").addEventListener("input", (e) => { state.speech = e.target.value; });
+    document.getElementById("speechOn").addEventListener("change", (e) => { state.speechOn = e.target.checked; });
+    document.getElementById("formatSeg").addEventListener("click", (e) => {
+      const b = e.target.closest("button"); if (!b) return;
+      document.querySelectorAll("#formatSeg button").forEach((n) => n.classList.remove("on"));
+      b.classList.add("on"); state.format = b.getAttribute("data-fmt");
+    });
+    document.getElementById("lenRange").addEventListener("input", (e) => {
+      state.len = parseInt(e.target.value, 10);
+      document.getElementById("lenVal").textContent = state.len + "s";
+    });
+
+    document.getElementById("pngBtn").addEventListener("click", () => {
+      const a = document.createElement("a");
+      a.download = "creatorflow_cartoon_frame.png";
+      a.href = canvas.toDataURL("image/png");
+      a.click();
+      window.showToast("Frame saved");
+    });
+
+    // ---------- export ----------
+    let renderCount = 0;
+    function humanSize(b) {
+      if (b < 1024) return b + " B";
+      if (b < 1048576) return (b / 1024).toFixed(0) + " KB";
+      return (b / 1048576).toFixed(1) + " MB";
+    }
+    function addRender(url, size, ext) {
+      renderCount++;
+      const box = document.getElementById("renderHistory");
+      const row = document.createElement("div");
+      row.className = "render-row";
+      row.innerHTML =
+        '<div class="ico green" style="width:34px;height:34px;border-radius:9px;flex-shrink:0;"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><rect x="2.5" y="4" width="19" height="16" rx="2.5"/><path d="M10 9l6 3-6 3z"/></svg></div>' +
+        '<div style="flex:1;min-width:0;"><div style="font-weight:600;font-size:13px;">cartoon_' + renderCount + '.' + ext + '</div><div class="faint" style="font-size:11.5px;">' + humanSize(size) + ' · 1280 by 720</div></div>' +
+        '<a class="btn sm primary" href="' + url + '" download="creatorflow_cartoon_' + renderCount + '.' + ext + '">Save</a>';
+      box.insertBefore(row, box.firstChild);
+    }
+
+    document.getElementById("exportBtn").addEventListener("click", async () => {
+      const prog = document.getElementById("exportProg");
+      const fill = document.getElementById("exportFill");
+      const btn = document.getElementById("exportBtn");
+      prog.style.display = "block"; btn.disabled = true;
+
+      const fps = 30, total = state.len;
+      const stream = canvas.captureStream(fps);
+      let tracks = stream.getVideoTracks();
+      if (voiceLoaded && streamDest) {
+        if (audioCtx.state === "suspended") await audioCtx.resume();
+        tracks = tracks.concat(streamDest.stream.getAudioTracks());
+      }
+      const mixed = new MediaStream(tracks);
+
+      let mime = "", ext = "webm";
+      if (state.format === "mp4") {
+        const m = "video/mp4;codecs=avc1.42E01E,mp4a.40.2";
+        if (MediaRecorder.isTypeSupported(m)) { mime = m; ext = "mp4"; }
+        else if (MediaRecorder.isTypeSupported("video/mp4")) { mime = "video/mp4"; ext = "mp4"; }
+      }
+      if (!mime) {
+        mime = MediaRecorder.isTypeSupported("video/webm;codecs=vp9,opus") ? "video/webm;codecs=vp9,opus" : "video/webm";
+        ext = "webm";
+        if (state.format === "mp4") window.showToast("MP4 is not supported here, saving WebM");
+      }
+      const rec = new MediaRecorder(mixed, { mimeType: mime, videoBitsPerSecond: 6000000 });
+      const chunks = [];
+      rec.ondataavailable = (e) => { if (e.data.size) chunks.push(e.data); };
+      rec.onstop = () => {
+        const blob = new Blob(chunks, { type: ext === "mp4" ? "video/mp4" : "video/webm" });
+        addRender(URL.createObjectURL(blob), blob.size, ext);
+        prog.style.display = "none"; btn.disabled = false;
+        exporting = false; lastNow = performance.now();
+        if (voiceLoaded) { if (playing) { try { voiceEl.play(); } catch (e) {} voicePlaying = true; } else voicePlaying = false; }
+        window.showToast(ext.toUpperCase() + " animation ready");
+      };
+
+      // render the animation from a clean start while recording
+      exporting = true; waveUntil = 0; jumpStart = null;
+      if (voiceLoaded) { try { voiceEl.currentTime = 0; voiceEl.play(); voicePlaying = true; } catch (e) {} }
+      rec.start();
+      let et = 0;
+      const begin = performance.now();
+      let finished = false;
+      function finish() {
+        if (finished) return; finished = true;
+        clearInterval(drv);
+        if (voiceLoaded) voiceEl.pause();
+        if (rec.state !== "inactive") rec.stop();
+      }
+      const drv = setInterval(() => {
+        et = (performance.now() - begin) / 1000;
+        if (et >= total) { finish(); return; }
+        draw(et);
+        fill.style.width = Math.min(100, (et / total) * 100) + "%";
+      }, 1000 / fps);
+      setTimeout(finish, total * 1000 + 600);
+    });
+
+    // start
+    setPlay(true);
+    raf = requestAnimationFrame(frame);
+  })();
+  </script>
+</Layout>

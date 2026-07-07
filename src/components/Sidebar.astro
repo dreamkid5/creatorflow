@@ -1,0 +1,100 @@
+---
+import Icon from "./Icon.astro";
+const { active } = Astro.props;
+
+const overview = [
+  { id: "dashboard", label: "Dashboard", href: "/", icon: "grid" },
+  { id: "analytics", label: "Analytics", href: "/analytics", icon: "chart" },
+  { id: "videos", label: "Videos", href: "/videos", icon: "video" },
+  { id: "schedule", label: "Schedule", href: "/schedule", icon: "calendar" }
+];
+
+const create = [
+  { id: "auto", label: "Auto Video", href: "/auto", icon: "wand", pill: "AI" },
+  { id: "studio", label: "Content Studio", href: "/studio", icon: "sparkles", pill: "AI" },
+  { id: "create", label: "Video Studio", href: "/create", icon: "film", pill: "New" },
+  { id: "thumbnail", label: "Thumbnail Studio", href: "/thumbnail", icon: "image" },
+  { id: "cartoon", label: "Cartoon Studio", href: "/cartoon", icon: "smile", pill: "Fun" },
+  { id: "media", label: "Media Library", href: "/media", icon: "folder" }
+];
+
+const automate = [
+  { id: "automations", label: "Automations", href: "/automations", icon: "sliders", pill: "Auto" },
+  { id: "bulk", label: "Bulk Studio", href: "/bulk", icon: "layers", pill: "Batch" }
+];
+
+const engage = [
+  { id: "inbox", label: "Comment Inbox", href: "/inbox", icon: "inbox", pill: "12" }
+];
+
+const system = [
+  { id: "guide", label: "Guide", href: "/guide", icon: "bulb", pill: "Help" },
+  { id: "settings", label: "Settings", href: "/settings", icon: "settings" },
+  { id: "admin", label: "Admin Panel", href: "/admin", icon: "shield" }
+];
+
+const render = (items) => items;
+---
+
+<aside class="sidebar" id="sidebar">
+  <div class="brand">
+    <div class="logo">
+      <svg viewBox="0 0 24 24" fill="#fff"><path d="M4 5.5A2.5 2.5 0 0 1 6.5 3h11A2.5 2.5 0 0 1 20 5.5v13a2.5 2.5 0 0 1-2.5 2.5h-11A2.5 2.5 0 0 1 4 18.5zM10 8.5v7l6-3.5z"/></svg>
+    </div>
+    <div>
+      <div class="name">Creator<span>Flow</span></div>
+      <div class="tag">Automation Suite</div>
+    </div>
+  </div>
+
+  <div class="nav-group-label">Overview</div>
+  {overview.map((n) => (
+    <a href={n.href} class={`nav-item ${active === n.id ? "active" : ""}`}>
+      <Icon name={n.icon} />
+      <span>{n.label}</span>
+    </a>
+  ))}
+
+  <div class="nav-group-label">Create</div>
+  {create.map((n) => (
+    <a href={n.href} class={`nav-item ${active === n.id ? "active" : ""}`}>
+      <Icon name={n.icon} />
+      <span>{n.label}</span>
+      {n.pill && <span class="pill">{n.pill}</span>}
+    </a>
+  ))}
+
+  <div class="nav-group-label">Automate</div>
+  {automate.map((n) => (
+    <a href={n.href} class={`nav-item ${active === n.id ? "active" : ""}`}>
+      <Icon name={n.icon} />
+      <span>{n.label}</span>
+      {n.pill && <span class="pill">{n.pill}</span>}
+    </a>
+  ))}
+
+  <div class="nav-group-label">Engage</div>
+  {engage.map((n) => (
+    <a href={n.href} class={`nav-item ${active === n.id ? "active" : ""}`}>
+      <Icon name={n.icon} />
+      <span>{n.label}</span>
+      {n.pill && <span class="pill">{n.pill}</span>}
+    </a>
+  ))}
+
+  <div class="nav-group-label">System</div>
+  {system.map((n) => (
+    <a href={n.href} class={`nav-item ${active === n.id ? "active" : ""}`}>
+      <Icon name={n.icon} />
+      <span>{n.label}</span>
+    </a>
+  ))}
+
+  <div class="sidebar-foot">
+    <div class="upgrade">
+      <h4>Go unlimited</h4>
+      <p>Unlock deeper insights and no caps on scheduled uploads.</p>
+      <a href="/settings" class="btn primary sm" style="width:100%; justify-content:center;">Upgrade plan</a>
+    </div>
+  </div>
+</aside>

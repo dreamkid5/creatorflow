@@ -1,0 +1,40 @@
+---
+// Vertical bar chart as SVG. Props: data (array of {day/label, value}), height
+const { data, height = 220 } = Astro.props;
+
+const w = 720;
+const h = height;
+const padTop = 16;
+const padBottom = 30;
+const gap = 22;
+const n = data.length;
+const barW = (w - gap * (n + 1)) / n;
+const max = Math.max(...data.map((d) => d.value)) * 1.15;
+
+const bars = data.map((d, i) => {
+  const x = gap + i * (barW + gap);
+  const bh = (d.value / max) * (h - padTop - padBottom);
+  const y = h - padBottom - bh;
+  return { x, y, bh, label: d.day || d.label, value: d.value, top: d.value === Math.max(...data.map((v) => v.value)) };
+});
+---
+<svg viewBox={`0 0 ${w} ${h}`} width="100%" style="display:block;">
+  <defs>
+    <linearGradient id="barGrad" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="var(--brand)" />
+      <stop offset="100%" stop-color="var(--violet)" />
+    </linearGradient>
+    <linearGradient id="barGradDim" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="var(--surface3)" />
+      <stop offset="100%" stop-color="var(--surface2)" />
+    </linearGradient>
+  </defs>
+
+  {bars.map((b) => (
+    <g>
+      <rect x={b.x} y={b.y} width={barW} height={b.bh} rx="7" fill={b.top ? "url(#barGrad)" : "url(#barGradDim)"} />
+      <text x={b.x + barW / 2} y={b.y - 7} text-anchor="middle" font-size="11" font-weight="700" fill={b.top ? "var(--violet2)" : "var(--faint)"}>{b.value}K</text>
+      <text x={b.x + barW / 2} y={h - 9} text-anchor="middle" font-size="11" font-weight="600" fill="var(--muted)">{b.label}</text>
+    </g>
+  ))}
+</svg>

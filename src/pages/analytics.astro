@@ -1,0 +1,154 @@
+---
+import Layout from "../layouts/Layout.astro";
+import Icon from "../components/Icon.astro";
+import LineChart from "../components/LineChart.astro";
+import BarChart from "../components/BarChart.astro";
+import { viewsSeries, seriesLabels, weekly, demographics, geography, videos } from "../data/demo.js";
+
+const kpis = [
+  { label: "Impressions", value: "0", trend: "0%", up: true },
+  { label: "Click through rate", value: "0%", trend: "0%", up: true },
+  { label: "Average view duration", value: "0:00", trend: "0%", up: true },
+  { label: "Average percentage viewed", value: "0%", trend: "0%", up: true }
+];
+
+const published = videos.filter((v) => v.status === "published");
+const hasViews = viewsSeries.length >= 2;
+---
+<Layout title="Analytics" subtitle="Deep insights into how your content performs" active="analytics" page="Analytics">
+
+  <div class="section-head">
+    <div><h2>Performance overview</h2><p id="anRange">Last 28 days compared with the previous period</p></div>
+    <div class="actions">
+      <div class="chips" id="anChips">
+        <button class="chip">7 days</button>
+        <button class="chip active">28 days</button>
+        <button class="chip">90 days</button>
+      </div>
+      <button class="btn sm" id="anRefresh"><Icon name="refresh" size={15} />Refresh</button>
+    </div>
+  </div>
+
+  <div class="empty-note" style="margin-bottom:18px;">Connect your YouTube channel on the Settings page to fill these with your real numbers. Everything shows zero until then.</div>
+
+  <section class="grid g-4">
+    {kpis.map((k) => (
+      <div class="card pad">
+        <div class="label muted" style="font-size:12.5px;font-weight:600;">{k.label}</div>
+        <div class="big-num" style="margin:8px 0 6px;">{k.value}</div>
+        <span class={`trend ${k.up ? "up" : "down"}`} style="font-size:12.5px;font-weight:700;padding:2px 8px;border-radius:20px;display:inline-flex;align-items:center;gap:3px;">
+          <Icon name={k.up ? "up" : "down"} size={13} />{k.trend}
+        </span>
+      </div>
+    ))}
+  </section>
+
+  <section class="grid g-3 mt-18">
+    <div class="card span-2">
+      <div class="card-head">
+        <div><h3>Views trend</h3><p>Daily views across the reporting window</p></div>
+      </div>
+      <div class="card-body">
+        {hasViews
+          ? <LineChart values={viewsSeries} color="var(--cyan)" id="an-views" labels={seriesLabels} height={250} />
+          : <div class="empty-note">No views data yet.</div>}
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="card-head"><div><h3>Audience age</h3><p>Viewer distribution</p></div></div>
+      <div class="card-body" style="padding-top:10px;">
+        {demographics.length ? demographics.map((d) => (
+          <div style="margin-bottom:16px;">
+            <div class="flex between" style="margin-bottom:7px;">
+              <span style="font-size:13px;font-weight:600;">{d.label}</span>
+              <span class="muted" style="font-size:13px;font-weight:700;">{d.pct}%</span>
+            </div>
+            <div class="bar"><span style={`width:${d.pct}%`}></span></div>
+          </div>
+        )) : (
+          <div class="empty-note">No audience data yet.</div>
+        )}
+      </div>
+    </div>
+  </section>
+
+  <section class="grid g-3 mt-18">
+    <div class="card span-2">
+      <div class="card-head"><div><h3>Best publishing days</h3><p>Average views by weekday of upload</p></div></div>
+      <div class="card-body">
+        {weekly.length
+          ? <BarChart data={weekly} height={240} />
+          : <div class="empty-note">No publishing data yet.</div>}
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="card-head"><div><h3>Top countries</h3><p>By share of views</p></div></div>
+      <div class="card-body" style="padding-top:8px;">
+        {geography.length ? geography.map((g) => (
+          <div class="lrow" style="padding:10px 0;">
+            <span style="font-size:22px;flex-shrink:0;">{g.flag}</span>
+            <div class="grow">
+              <div class="t" style="font-size:13px;">{g.country}</div>
+              <div class="bar" style="margin-top:6px;"><span style={`width:${g.pct * 2.4}%`}></span></div>
+            </div>
+            <div class="val" style="font-size:13px;">{g.pct}%</div>
+          </div>
+        )) : (
+          <div class="empty-note">No country data yet.</div>
+        )}
+      </div>
+    </div>
+  </section>
+
+  <section class="mt-18">
+    <div class="card">
+      <div class="card-head"><div><h3>Video breakdown</h3><p>Metrics for every published upload</p></div></div>
+      <div class="card-body" style="padding:0; overflow-x:auto;">
+        <table class="table" style="min-width:720px;">
+          <thead><tr><th>Video</th><th>Views</th><th>Click rate</th><th>Likes</th><th>Comments</th><th>Retention</th></tr></thead>
+          <tbody>
+            {published.length ? published.map((v) => (
+              <tr>
+                <td>
+                  <div class="vid-cell">
+                    <div class="vid-thumb" style="font-size:20px;">{v.thumb}<span class="dur">{v.duration}</span></div>
+                    <div class="vid-title" style="max-width:280px;">{v.title}<div class="sub">{v.published}</div></div>
+                  </div>
+                </td>
+                <td style="font-weight:700;">{v.views}</td>
+                <td>{v.ctr}</td>
+                <td>{v.likes}</td>
+                <td>{v.comments}</td>
+                <td>
+                  <div class="flex center gap-10">
+                    <div class="bar" style="width:60px;"><span style={`width:${v.retention}%`}></span></div>
+                    <span class="muted" style="font-size:12.5px;font-weight:700;">{v.retention}%</span>
+                  </div>
+                </td>
+              </tr>
+            )) : (
+              <tr><td colspan="6" class="muted" style="text-align:center; padding:22px;">No published videos yet.</td></tr>
+            )}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </section>
+
+  <script is:inline>
+    (function () {
+      const chips = Array.from(document.querySelectorAll("#anChips .chip"));
+      const sub = document.getElementById("anRange");
+      chips.forEach((c) => c.addEventListener("click", () => {
+        chips.forEach((x) => x.classList.remove("active"));
+        c.classList.add("active");
+        if (sub) sub.textContent = "Last " + c.textContent.trim() + " compared with the previous period";
+        window.showToast && window.showToast("Showing " + c.textContent.trim());
+      }));
+      const rf = document.getElementById("anRefresh");
+      if (rf) rf.addEventListener("click", () => window.showToast && window.showToast("Analytics refreshed"));
+    })();
+  </script>
+</Layout>

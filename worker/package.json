@@ -1,0 +1,15 @@
+{
+  "name": "creatorflow-worker",
+  "private": true,
+  "type": "module",
+  "version": "1.0.0",
+  "description": "Background renderer for CreatorFlow. Watches a folder of CSV files and renders a finished video for every row using ffmpeg. No browser required.",
+  "scripts": {
+    "check": "node check-keys.mjs",
+    "now": "node daily.mjs --watch",
+    "daily": "node daily.mjs",
+    "once": "node watch.mjs --once",
+    "watch": "node watch.mjs"
+  },
+  "engines": { "node": ">=18" }
+}

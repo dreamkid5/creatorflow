@@ -1,0 +1,95 @@
+name: Daily videos
+
+# Runs in the cloud on a schedule, free, even with your Mac off.
+# It reads scripts from the content folder, renders each into a narrated
+# illustrated video, writes SEO with Claude, and publishes to YouTube.
+
+on:
+  schedule:
+    - cron: "0 7 * * *"   # every day at 07:00 UTC. Change the time to suit you.
+  workflow_dispatch: {}    # also lets you run it by hand from the Actions tab
+
+permissions:
+  contents: write          # so it can archive published scripts back to the repo
+
+concurrency:
+  group: daily-videos
+  cancel-in-progress: false
+
+jobs:
+  make:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+
+      - name: Make sure ffmpeg is present
+        run: ffmpeg -version >/dev/null 2>&1 || (sudo apt-get update && sudo apt-get install -y ffmpeg)
+
+      - name: Cache the Piper voice
+        uses: actions/cache@v4
+        with:
+          path: voice-server/voices
+          key: piper-en_GB-alan-medium
+
+      - name: Install the Piper voice engine
+        run: |
+          python3 -m venv "$HOME/piper-venv"
+          "$HOME/piper-venv/bin/pip" install --quiet --upgrade pip piper-tts
+          mkdir -p voice-server/voices
+          if [ ! -f voice-server/voices/en_GB-alan-medium.onnx ]; then
+            base="https://huggingface.co/rhasspy/piper-voices/resolve/main/en/en_GB/alan/medium"
+            curl -sL -o voice-server/voices/en_GB-alan-medium.onnx "$base/en_GB-alan-medium.onnx"
+            curl -sL -o voice-server/voices/en_GB-alan-medium.onnx.json "$base/en_GB-alan-medium.onnx.json"
+          fi
+
+      - name: Start the voice server
+        run: |
+          PIPER_CMD="$HOME/piper-venv/bin/python" \
+          PIPER_MODEL="$PWD/voice-server/voices/en_GB-alan-medium.onnx" \
+          PORT=5111 node voice-server/server.mjs &
+          for i in $(seq 1 20); do curl -sf http://localhost:5111 >/dev/null && break; sleep 1; done
+          curl -s http://localhost:5111 >/dev/null || (echo "voice server did not start" && exit 1)
+
+      - name: Render and publish
+        env:
+          LOCAL_TTS_URL: http://localhost:5111
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+          YT_CLIENT_ID: ${{ secrets.YT_CLIENT_ID }}
+          YT_CLIENT_SECRET: ${{ secrets.YT_CLIENT_SECRET }}
+          YT_REFRESH_TOKEN: ${{ secrets.YT_REFRESH_TOKEN }}
+          CF_YT_PRIVACY: ${{ secrets.CF_YT_PRIVACY }}
+          CF_IMAGE_TOKEN: ${{ secrets.CF_IMAGE_TOKEN }}
+          CF_STYLE: watercolor
+          CF_INPUT: content
+          CF_OUTPUT: output
+        run: node worker/watch.mjs --once
+
+      - name: Archive the scripts it just published
+        run: |
+          shopt -s nullglob
+          moved=0
+          mkdir -p content/published
+          for f in content/*.txt; do
+            b=$(basename "$f")
+            case "$b" in _*) continue;; esac
+            mv "$f" "content/published/$b"; moved=1
+          done
+          if [ "$moved" = "1" ]; then
+            git config user.name "github-actions[bot]"
+            git config user.email "github-actions[bot]@users.noreply.github.com"
+            git add content
+            git commit -m "Archive published scripts [skip ci]" || true
+            git push || true
+          fi
+
+      - name: Keep the finished videos as a download
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: videos
+          path: output/*.mp4
+          if-no-files-found: ignore

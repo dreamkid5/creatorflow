@@ -1,0 +1,191 @@
+---
+import Layout from "../layouts/Layout.astro";
+import Icon from "../components/Icon.astro";
+import { mediaItems, storage } from "../data/demo.js";
+
+const label = (s) => s.charAt(0).toUpperCase() + s.slice(1);
+---
+<Layout title="Media Library" subtitle="Upload and organize every asset for your videos" active="media" page="Media Library">
+
+  <!-- Upload zones -->
+  <section class="grid g-4" style="margin-bottom:22px;">
+    <div class="dropzone" data-accept="image/*" data-kind="image">
+      <div class="dz-ico"><Icon name="image" size={24} /></div>
+      <h4>Images</h4>
+      <p>Drop photos or click to browse</p>
+    </div>
+    <div class="dropzone" data-accept="audio/*" data-kind="audio">
+      <div class="dz-ico"><Icon name="music" size={24} /></div>
+      <h4>Audio</h4>
+      <p>Voiceovers and music tracks</p>
+    </div>
+    <div class="dropzone" data-accept=".txt,.md,.doc,.docx" data-kind="script">
+      <div class="dz-ico"><Icon name="doc" size={24} /></div>
+      <h4>Scripts</h4>
+      <p>Text files for your videos</p>
+    </div>
+    <div class="dropzone" data-accept="video/*" data-kind="video">
+      <div class="dz-ico"><Icon name="film" size={24} /></div>
+      <h4>Video</h4>
+      <p>Raw footage and clips</p>
+    </div>
+  </section>
+
+  <section class="grid" style="grid-template-columns: 1fr 300px; gap:18px; align-items:start;">
+    <!-- Library grid -->
+    <div class="card">
+      <div class="card-head">
+        <div><h3>Your assets</h3><p id="assetCount">{mediaItems.length} files</p></div>
+        <div class="actions">
+          <div class="chips" id="mediaFilter">
+            <button class="chip active" data-f="all">All</button>
+            <button class="chip" data-f="image">Images</button>
+            <button class="chip" data-f="audio">Audio</button>
+            <button class="chip" data-f="script">Scripts</button>
+            <button class="chip" data-f="video">Video</button>
+          </div>
+        </div>
+      </div>
+      <div class="card-body">
+        <div class="media-grid" id="mediaGrid">
+          {mediaItems.map((m) => (
+            <div class="media-card" data-kind={m.kind}>
+              <div class="media-thumb">
+                <span class="kind">{m.kind}</span>
+                <span class="big">{m.emoji}</span>
+                {m.extra && <span class="dur" style="position:absolute;bottom:8px;right:8px;font-size:10px;font-weight:700;background:rgba(0,0,0,.7);color:#fff;padding:2px 6px;border-radius:5px;">{m.extra}</span>}
+              </div>
+              <div class="media-meta">
+                <div class="mn">{m.name}</div>
+                <div class="ms">{m.size}</div>
+              </div>
+            </div>
+          ))}
+        </div>
+        <div class="empty-note" id="mediaEmpty" style="display:none;">No files of this type yet.</div>
+      </div>
+    </div>
+
+    <!-- Storage -->
+    <div style="display:flex; flex-direction:column; gap:18px;">
+      <div class="card">
+        <div class="card-head"><div><h3>Storage</h3><p>0 GB of 40 GB used</p></div></div>
+        <div class="card-body">
+          <div class="storage-bar" style="margin-bottom:16px;">
+            {storage.map((s) => <span style={`width:${s.pct}%;background:${s.color}`}></span>)}
+          </div>
+          {storage.map((s) => (
+            <div class="lrow" style="padding:9px 0;">
+              <span class="d" style={`width:11px;height:11px;border-radius:3px;background:${s.color};flex-shrink:0;`}></span>
+              <div class="grow"><div class="t" style="font-size:13px;">{s.label}</div></div>
+              <div class="val" style="font-size:13px;">{s.pct}%</div>
+            </div>
+          ))}
+          <button class="btn primary sm" style="width:100%;justify-content:center;margin-top:12px;">Get more space</button>
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="card-head"><div><h3>Quick tip</h3></div></div>
+        <div class="card-body">
+          <p class="muted" style="font-size:13px;line-height:1.55;">Send any image or audio file straight into the Video Studio to build a video, or into the Thumbnail Studio to design a cover.</p>
+          <a href="/create" class="btn sm" style="margin-top:12px;"><Icon name="film" size={15} />Open Video Studio</a>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <input type="file" id="hiddenInput" style="display:none;" multiple />
+
+  <script is:inline>
+    const grid = document.getElementById("mediaGrid");
+    const hidden = document.getElementById("hiddenInput");
+    let activeKind = "image";
+
+    function human(bytes) {
+      if (bytes < 1024) return bytes + " B";
+      if (bytes < 1048576) return (bytes / 1024).toFixed(1) + " KB";
+      return (bytes / 1048576).toFixed(1) + " MB";
+    }
+
+    function addFile(file, kind) {
+      const card = document.createElement("div");
+      card.className = "media-card";
+      card.setAttribute("data-kind", kind);
+      const url = URL.createObjectURL(file);
+      let media = `<span class="big">📄</span>`;
+      if (kind === "image") media = `<img src="${url}" alt="">`;
+      else if (kind === "video") media = `<video src="${url}" muted></video>`;
+      else if (kind === "audio") media = `<span class="big">🎵</span>`;
+      else media = `<span class="big">📝</span>`;
+      card.innerHTML =
+        `<div class="media-thumb"><span class="kind">${kind}</span>${media}</div>` +
+        `<div class="media-meta"><div class="mn">${file.name}</div><div class="ms">${human(file.size)}</div></div>`;
+      grid.insertBefore(card, grid.firstChild);
+      window.showToast(file.name + " added");
+      // make sure the new file stays visible: if the active filter hides this kind, switch to it
+      const activeChip = document.querySelector("#mediaFilter .chip.active");
+      const activeF = activeChip ? activeChip.getAttribute("data-f") : "all";
+      if (activeF !== "all" && activeF !== kind) {
+        const target = document.querySelector('#mediaFilter .chip[data-f="' + kind + '"]');
+        if (target && activeChip) { activeChip.classList.remove("active"); target.classList.add("active"); }
+        applyFilter(kind);
+      } else {
+        applyFilter(activeF);
+      }
+    }
+
+    function handleFiles(files, kind) {
+      Array.from(files).forEach((f) => {
+        let k = kind;
+        if (!k || k === "auto") {
+          if (f.type.startsWith("image")) k = "image";
+          else if (f.type.startsWith("audio")) k = "audio";
+          else if (f.type.startsWith("video")) k = "video";
+          else k = "script";
+        }
+        addFile(f, k);
+      });
+    }
+
+    document.querySelectorAll(".dropzone").forEach((dz) => {
+      const kind = dz.getAttribute("data-kind");
+      dz.addEventListener("click", () => {
+        activeKind = kind;
+        hidden.setAttribute("accept", dz.getAttribute("data-accept"));
+        hidden.click();
+      });
+      dz.addEventListener("dragover", (e) => { e.preventDefault(); dz.classList.add("drag"); });
+      dz.addEventListener("dragleave", () => dz.classList.remove("drag"));
+      dz.addEventListener("drop", (e) => {
+        e.preventDefault();
+        dz.classList.remove("drag");
+        handleFiles(e.dataTransfer.files, kind);
+      });
+    });
+
+    hidden.addEventListener("change", () => {
+      handleFiles(hidden.files, activeKind);
+      hidden.value = "";
+    });
+
+    // filter
+    function applyFilter(f) {
+      let shown = 0;
+      grid.querySelectorAll(".media-card").forEach((c) => {
+        const match = f === "all" || c.getAttribute("data-kind") === f;
+        c.style.display = match ? "" : "none";
+        if (match) shown++;
+      });
+      document.getElementById("mediaEmpty").style.display = shown ? "none" : "block";
+      document.getElementById("assetCount").textContent = grid.querySelectorAll(".media-card").length + " files";
+    }
+    document.getElementById("mediaFilter").addEventListener("click", (e) => {
+      const chip = e.target.closest(".chip");
+      if (!chip) return;
+      document.querySelectorAll("#mediaFilter .chip").forEach((c) => c.classList.remove("active"));
+      chip.classList.add("active");
+      applyFilter(chip.getAttribute("data-f"));
+    });
+  </script>
+</Layout>

@@ -1,0 +1,87 @@
+---
+import "../styles/global.css";
+import Sidebar from "../components/Sidebar.astro";
+import Topbar from "../components/Topbar.astro";
+import Icon from "../components/Icon.astro";
+
+const { title = "Dashboard", subtitle = "", active = "dashboard", page = "CreatorFlow" } = Astro.props;
+---
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="description" content="CreatorFlow, a professional YouTube automation suite for growing channels." />
+    <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
+    <title>{page} · CreatorFlow</title>
+  </head>
+  <body>
+    <div class="app">
+      <Sidebar active={active} />
+      <div class="main">
+        <Topbar title={title} subtitle={subtitle} />
+        <main class="content">
+          <slot />
+        </main>
+      </div>
+    </div>
+
+    <div class="toast" id="toast">
+      <Icon name="check" size={17} />
+      <span id="toastMsg">Copied to clipboard</span>
+    </div>
+
+    <div id="scrim" style="display:none; position:fixed; inset:0; background:rgba(0,0,0,.5); z-index:35;"></div>
+
+    <script is:inline>
+      // Theme persistence
+      (function () {
+        const saved = localStorage.getItem("cf-theme");
+        if (saved === "light") document.body.classList.add("light");
+      })();
+
+      document.addEventListener("click", function (e) {
+        const t = e.target.closest("#themeToggle");
+        if (t) {
+          document.body.classList.toggle("light");
+          localStorage.setItem("cf-theme", document.body.classList.contains("light") ? "light" : "dark");
+        }
+      });
+
+      // Mobile sidebar
+      const sidebar = document.getElementById("sidebar");
+      const scrim = document.getElementById("scrim");
+      document.addEventListener("click", function (e) {
+        if (e.target.closest("#menuBtn")) {
+          sidebar.classList.add("open");
+          scrim.style.display = "block";
+        } else if (e.target === scrim) {
+          sidebar.classList.remove("open");
+          scrim.style.display = "none";
+        }
+      });
+
+      // Toast helper
+      window.showToast = function (msg) {
+        const toast = document.getElementById("toast");
+        document.getElementById("toastMsg").textContent = msg || "Copied to clipboard";
+        toast.classList.add("show");
+        clearTimeout(window._tt);
+        window._tt = setTimeout(() => toast.classList.remove("show"), 1900);
+      };
+
+      // Copy on click for any element with data-copy
+      document.addEventListener("click", function (e) {
+        const c = e.target.closest("[data-copy]");
+        if (c) {
+          const text = c.getAttribute("data-copy");
+          if (navigator.clipboard) navigator.clipboard.writeText(text);
+          window.showToast("Copied to clipboard");
+        }
+      });
+    </script>
+  </body>
+</html>

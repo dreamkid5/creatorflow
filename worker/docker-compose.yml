@@ -1,0 +1,19 @@
+services:
+  worker:
+    build: .
+    container_name: creatorflow-worker
+    restart: unless-stopped
+    environment:
+      # Narration (optional)
+      - TTS_API_KEY=${TTS_API_KEY:-}
+      # YouTube auto upload (optional)
+      - YT_CLIENT_ID=${YT_CLIENT_ID:-}
+      - YT_CLIENT_SECRET=${YT_CLIENT_SECRET:-}
+      - YT_REFRESH_TOKEN=${YT_REFRESH_TOKEN:-}
+      - CF_YT_PRIVACY=${CF_YT_PRIVACY:-private}
+      # Rendering
+      - CF_STYLE=${CF_STYLE:-watercolor}
+      - CF_INTERVAL=${CF_INTERVAL:-30}
+    volumes:
+      - ./input:/app/input
+      - ./output:/app/output

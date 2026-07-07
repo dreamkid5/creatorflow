@@ -1,0 +1,66 @@
+---
+// Smooth area chart rendered as pure SVG at build time.
+// Props: values (array of numbers), color, id (unique), height, labels (optional)
+const { values, color = "var(--violet)", id = "lc", height = 220, labels = [] } = Astro.props;
+
+const w = 720;
+const h = height;
+const padX = 8;
+const padTop = 18;
+const padBottom = labels.length ? 26 : 12;
+
+const max = Math.max(...values) * 1.12;
+const min = Math.min(...values) * 0.86;
+const span = max - min || 1;
+
+const stepX = (w - padX * 2) / (values.length - 1);
+const pts = values.map((v, i) => {
+  const x = padX + i * stepX;
+  const y = padTop + (1 - (v - min) / span) * (h - padTop - padBottom);
+  return [x, y];
+});
+
+// Smooth cubic path
+function smooth(points) {
+  if (points.length < 2) return "";
+  let d = `M ${points[0][0]} ${points[0][1]}`;
+  for (let i = 0; i < points.length - 1; i++) {
+    const [x0, y0] = points[i];
+    const [x1, y1] = points[i + 1];
+    const cx = (x0 + x1) / 2;
+    d += ` C ${cx} ${y0}, ${cx} ${y1}, ${x1} ${y1}`;
+  }
+  return d;
+}
+
+const line = smooth(pts);
+const area = `${line} L ${pts[pts.length - 1][0]} ${h - padBottom} L ${pts[0][0]} ${h - padBottom} Z`;
+
+// gridlines
+const gridY = [0.25, 0.5, 0.75, 1].map((f) => padTop + f * (h - padTop - padBottom));
+---
+<svg viewBox={`0 0 ${w} ${h}`} width="100%" style="display:block; overflow:visible;">
+  <defs>
+    <linearGradient id={`grad-${id}`} x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color={color} stop-opacity="0.34" />
+      <stop offset="100%" stop-color={color} stop-opacity="0" />
+    </linearGradient>
+  </defs>
+
+  {gridY.map((y) => (
+    <line x1={padX} y1={y} x2={w - padX} y2={y} stroke="var(--border)" stroke-width="1" stroke-dasharray="3 5" />
+  ))}
+
+  <path d={area} fill={`url(#grad-${id})`} />
+  <path d={line} fill="none" stroke={color} stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round" />
+
+  {pts.map((p, i) => (
+    <circle cx={p[0]} cy={p[1]} r={i === pts.length - 1 ? 5 : 0} fill={color} stroke="var(--surface)" stroke-width="2.5" />
+  ))}
+
+  {labels.length > 0 && labels.map((lab, i) => (
+    (i % 2 === 0 || i === labels.length - 1) && (
+      <text x={padX + i * stepX} y={h - 6} text-anchor="middle" font-size="10.5" fill="var(--faint)" font-weight="600">{lab}</text>
+    )
+  ))}
+</svg>
