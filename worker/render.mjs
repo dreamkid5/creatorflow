@@ -5,6 +5,7 @@ import { spawn } from "node:child_process";
 import fs from "node:fs/promises";
 import path from "node:path";
 import { splitScript, buildPrompt, styleKeywords, VOICES } from "./csv.mjs";
+import { buildCharacterBible, sceneCharacterNote } from "./characters.mjs";
 
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
@@ -192,11 +193,20 @@ export async function renderJob(job, cfg, workDir, outFile) {
   const scenes = splitScript(job.script);
   const style = styleKeywords[job.style] ? job.style : cfg.style;
 
+  // Character bible: keep the main characters looking the same across scenes.
+  let bible = null;
+  if (cfg.anthropicKey && cfg.characters !== false) {
+    bible = await buildCharacterBible(job.script, cfg);
+    if (bible && bible.characters.length) cfg.log("  character bible: " + bible.characters.map((c) => c.name).join(", "));
+  }
+  const charState = { active: null };
+
   const imgs = [];
   for (let i = 0; i < scenes.length; i++) {
     const p = path.join(workDir, "img" + i + ".jpg");
     cfg.log("  scene " + (i + 1) + "/" + scenes.length + ": generating image");
-    if (await fetchImage(buildPrompt(scenes[i], style), 3000 + i * 7, p, cfg)) imgs.push(p);
+    const sceneText = scenes[i] + sceneCharacterNote(scenes[i], bible, charState);
+    if (await fetchImage(buildPrompt(sceneText, style), 3000 + i * 7, p, cfg)) imgs.push(p);
   }
   if (!imgs.length) throw new Error("no images were generated");
 
