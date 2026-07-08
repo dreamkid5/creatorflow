@@ -118,18 +118,20 @@ async function processCSV(file, processed) {
       await renderJob(job, cfg, workDir, outFile);
       log("  saved " + path.relative(process.cwd(), outFile));
 
-      // SEO metadata from Claude: better title, description, and tags
+      // SEO metadata from Claude: description and tags. Your title (from the file
+      // name or CSV) is always kept; Claude's title idea is saved as a suggestion.
       if (cfg.seoEnabled) {
         const seo = await generateSEO(job.script, cfg);
         if (seo) {
-          job.title = seo.title || job.title;
           job.seoDescription = seo.description;
           job.seoTags = seo.tags;
           const metaText =
-            "TITLE\n" + job.title + "\n\nDESCRIPTION\n" + (seo.description || "") +
+            "TITLE\n" + job.title +
+            "\n\nCLAUDE TITLE SUGGESTION\n" + (seo.title || "") +
+            "\n\nDESCRIPTION\n" + (seo.description || "") +
             "\n\nTAGS\n" + (seo.tags || []).join(", ") + "\n";
           try { await fs.writeFile(path.join(cfg.output, base + ".txt"), metaText); } catch (e) {}
-          log("  SEO ready: " + job.title);
+          log("  SEO ready (title kept as: " + job.title + ")");
         } else {
           log("  SEO skipped (check the Claude key)");
         }
