@@ -6,7 +6,12 @@
 
 import fs from "node:fs";
 import path from "node:path";
+import { fileURLToPath } from "node:url";
 import { styleKeywords, buildPrompt } from "./csv.mjs";
+
+const HERE = path.dirname(fileURLToPath(import.meta.url));
+// Anton: a heavy condensed display font used on countless professional thumbnails.
+const ANTON = path.join(HERE, "assets", "fonts", "Anton-Regular.ttf");
 
 function extractJSON(text) {
   if (!text) return null;
@@ -45,8 +50,8 @@ async function thumbnailPlan(job, cfg) {
 function findFont(cfg) {
   const list = [
     cfg.font,
+    ANTON,
     "/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf",
-    "/usr/share/fonts/truetype/liberation/LiberationSans-Bold.ttf",
     "/System/Library/Fonts/Supplemental/Arial Bold.ttf",
     "/Library/Fonts/Arial Bold.ttf"
   ].filter(Boolean);
@@ -80,19 +85,24 @@ export async function buildThumbnail(job, cfg, workDir, outFile, deps) {
   const lines = toLines(plan && plan.headline, job.title);
   const font = findFont(cfg);
   const maxLen = Math.max(...lines.map((l) => l.length));
-  const fontsize = maxLen <= 10 ? 104 : maxLen <= 15 ? 84 : 66;
-  const scrimH = lines.length > 1 ? Math.round(fontsize * 2.6 + 60) : Math.round(fontsize + 90);
+  // Anton is condensed, so it carries a bigger size cleanly
+  const fontsize = maxLen <= 10 ? 122 : maxLen <= 16 ? 100 : maxLen <= 22 ? 82 : 66;
+  const lh = Math.round(fontsize * 1.14);
+  const gradStart = 720 - (lines.length > 1 ? 340 : 240);
 
-  let vf = "scale=1280:720:force_original_aspect_ratio=increase,crop=1280:720,";
-  vf += "drawbox=x=0:y=ih-" + scrimH + ":w=iw:h=" + scrimH + ":color=black@0.5:t=fill";
-  if (font) {
-    const lh = fontsize + 20;
-    lines.forEach((ln, i) => {
-      const fromBottom = 46 + (lines.length - 1 - i) * lh + fontsize;
-      vf += ",drawtext=fontfile='" + font + "':text='" + ln + "':fontcolor=white:fontsize=" + fontsize +
-        ":borderw=7:bordercolor=black@0.95:x=(w-text_w)/2:y=h-" + fromBottom;
+  // Cinematic bottom gradient (transparent to dark) instead of a flat black bar.
+  let fc = "[1]format=rgba,geq=r=0:g=0:b=0:a='min(235,max(0,235*(Y-" + gradStart + ")/" + (720 - gradStart) + "))'[g];";
+  fc += "[0:v]scale=1280:720:force_original_aspect_ratio=increase,crop=1280:720[v];";
+  fc += "[v][g]overlay=format=auto";
+  if (font && lines.length) {
+    const draws = lines.map((ln, i) => {
+      const fromBottom = 56 + (lines.length - 1 - i) * lh + fontsize;
+      return "drawtext=fontfile='" + font + "':text='" + ln + "':fontcolor=white:fontsize=" + fontsize +
+        ":borderw=9:bordercolor=black:shadowcolor=black@0.5:shadowx=5:shadowy=7:x=(w-text_w)/2:y=h-" + fromBottom;
     });
+    fc += "," + draws.join(",");
   }
-  await deps.run(cfg.ffmpeg, ["-y", "-i", src, "-vf", vf, "-frames:v", "1", "-q:v", "3", outFile]);
+  fc += "[out]";
+  await deps.run(cfg.ffmpeg, ["-y", "-i", src, "-f", "lavfi", "-i", "color=black:s=1280x720", "-filter_complex", fc, "-map", "[out]", "-frames:v", "1", "-update", "1", "-q:v", "3", outFile]);
   return fs.existsSync(outFile) ? outFile : null;
 }
