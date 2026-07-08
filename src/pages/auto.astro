@@ -194,6 +194,9 @@ const premiumLabel = premiumProvider === "local" ? "Narrator, free local voice" 
             <span class="hint">This replaces the scenes below with one per sentence or paragraph.</span>
           </div>
         </div>
+        <div id="longVideoNote" style="display:none; margin-bottom:16px; padding:13px 15px; border-radius:12px; background:rgba(124,92,255,.12); border:1px solid rgba(124,92,255,.35); font-size:13px; line-height:1.5;">
+          <strong>This is a long video (<span id="lvnCount">0</span> scenes).</strong> This page builds videos live in your browser, which works well up to about a dozen scenes. For a long video like this, use the cloud automation instead: it renders every scene with motion and full narration on its own. Add your script to the <strong>content</strong> folder in your project, and it makes the whole video.
+        </div>
         <div id="sceneList"></div>
       </div>
     </div>
@@ -254,7 +257,15 @@ const premiumLabel = premiumProvider === "local" ? "Narrator, free local voice" 
 
     // ---------- scene rows ----------
     const sceneList = document.getElementById("sceneList");
+    function updateLongVideoNote() {
+      const note = document.getElementById("longVideoNote");
+      if (!note) return;
+      const many = scenes.length > 12;
+      note.style.display = many ? "block" : "none";
+      if (many) document.getElementById("lvnCount").textContent = scenes.length;
+    }
     function renderScenes() {
+      updateLongVideoNote();
       sceneList.innerHTML = scenes.map((s, i) => {
         let thumb;
         if (s.status === "gen-image") thumb = '<span class="spin"></span>';
