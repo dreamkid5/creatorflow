@@ -7,7 +7,17 @@ name: Daily videos
 on:
   schedule:
     - cron: "0 7 * * *"   # every day at 07:00 UTC. Change the time to suit you.
-  workflow_dispatch: {}    # also lets you run it by hand from the Actions tab
+  workflow_dispatch:       # run by hand from the Actions tab, with a voice picker
+    inputs:
+      voice:
+        description: "Narrator voice"
+        type: choice
+        default: "British documentary (Alan)"
+        options:
+          - "British documentary (Alan)"
+          - "American warm (Lessac)"
+          - "British northern male"
+          - "American clear (Ryan)"
 
 permissions:
   contents: write          # so it can archive published scripts back to the repo
@@ -29,27 +39,40 @@ jobs:
       - name: Make sure ffmpeg is present
         run: ffmpeg -version >/dev/null 2>&1 || (sudo apt-get update && sudo apt-get install -y ffmpeg)
 
-      - name: Cache the Piper voice
+      - name: Cache the Piper voices
         uses: actions/cache@v4
         with:
           path: voice-server/voices
-          key: piper-en_GB-alan-medium
+          key: piper-voices
 
       - name: Install the Piper voice engine
+        env:
+          # manual runs pass a voice; scheduled runs use the CF_VOICE repo variable, else Alan
+          VOICE: ${{ github.event.inputs.voice || vars.CF_VOICE || 'British documentary (Alan)' }}
         run: |
           python3 -m venv "$HOME/piper-venv"
           "$HOME/piper-venv/bin/pip" install --quiet --upgrade pip piper-tts
           mkdir -p voice-server/voices
-          if [ ! -f voice-server/voices/en_GB-alan-medium.onnx ]; then
-            base="https://huggingface.co/rhasspy/piper-voices/resolve/main/en/en_GB/alan/medium"
-            curl -sL -o voice-server/voices/en_GB-alan-medium.onnx "$base/en_GB-alan-medium.onnx"
-            curl -sL -o voice-server/voices/en_GB-alan-medium.onnx.json "$base/en_GB-alan-medium.onnx.json"
+          case "$VOICE" in
+            *[Ll]essac*|en_US-lessac-high) model="en_US-lessac-high";;
+            *[Nn]orthern*|en_GB-northern_english_male-medium) model="en_GB-northern_english_male-medium";;
+            *[Rr]yan*|en_US-ryan-high) model="en_US-ryan-high";;
+            *) model="en_GB-alan-medium";;
+          esac
+          locale="${model%%-*}"; rest="${model#*-}"; voice="${rest%-*}"; quality="${rest##*-}"
+          top="$(echo "${locale%%_*}" | tr '[:upper:]' '[:lower:]')"
+          base="https://huggingface.co/rhasspy/piper-voices/resolve/main/${top}/${locale}/${voice}/${quality}"
+          if [ ! -f "voice-server/voices/${model}.onnx" ]; then
+            curl -sL -o "voice-server/voices/${model}.onnx" "${base}/${model}.onnx"
+            curl -sL -o "voice-server/voices/${model}.onnx.json" "${base}/${model}.onnx.json"
           fi
+          echo "Narrator voice: $model"
+          echo "VOICE_MODEL=$PWD/voice-server/voices/${model}.onnx" >> "$GITHUB_ENV"
 
       - name: Start the voice server
         run: |
           PIPER_CMD="$HOME/piper-venv/bin/python" \
-          PIPER_MODEL="$PWD/voice-server/voices/en_GB-alan-medium.onnx" \
+          PIPER_MODEL="$VOICE_MODEL" \
           PORT=5111 node voice-server/server.mjs &
           for i in $(seq 1 20); do curl -sf http://localhost:5111 >/dev/null && break; sleep 1; done
           curl -s http://localhost:5111 >/dev/null || (echo "voice server did not start" && exit 1)
