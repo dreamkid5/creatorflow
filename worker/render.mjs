@@ -130,12 +130,15 @@ async function fetchMusic(url, outPath) {
 
 // ---------- ffmpeg steps ----------
 // A single still becomes a gently zooming clip (Ken Burns).
-function kenBurnsClip(imgPath, outPath, dur, cfg) {
-  const frames = Math.round(dur * 30);
+// Uses a scale based zoom rather than the zoompan filter, which is dozens of
+// times faster, so videos with many scenes render in minutes, not hours.
+// The zoom direction alternates per scene for variety.
+function kenBurnsClip(imgPath, outPath, dur, cfg, idx = 0) {
+  const D = Math.max(0.1, dur);
+  const z = (idx % 2 === 0) ? "(1+0.12*t/" + D + ")" : "(1.12-0.12*t/" + D + ")";
   const vf =
     "scale=1280:720:force_original_aspect_ratio=increase,crop=1280:720," +
-    "zoompan=z='min(zoom+0.0009,1.12)':d=" + frames +
-    ":x='iw/2-(iw/zoom/2)':y='ih/2-(ih/zoom/2)':s=1280x720:fps=30,format=yuv420p";
+    "scale=w='1280*" + z + "':h='720*" + z + "':eval=frame,crop=1280:720,format=yuv420p";
   return run(cfg.ffmpeg, ["-y", "-loop", "1", "-t", String(dur), "-i", imgPath, "-vf", vf, "-r", "30", "-c:v", "libx264", "-preset", "veryfast", "-crf", "23", "-pix_fmt", "yuv420p", outPath]);
 }
 
@@ -215,7 +218,7 @@ export async function renderJob(job, cfg, workDir, outFile) {
   const clips = [];
   for (let i = 0; i < imgs.length; i++) {
     const c = path.join(workDir, "clip" + i + ".mp4");
-    await kenBurnsClip(imgs[i], c, dur, cfg);
+    await kenBurnsClip(imgs[i], c, dur, cfg, i);
     clips.push(c);
   }
   const silent = path.join(workDir, "silent.mp4");
