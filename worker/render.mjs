@@ -6,6 +6,7 @@ import fs from "node:fs/promises";
 import path from "node:path";
 import { splitScript, buildPrompt, styleKeywords, VOICES } from "./csv.mjs";
 import { buildCharacterBible, sceneCharacterNote } from "./characters.mjs";
+import { buildThumbnail } from "./thumbnail.mjs";
 
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
@@ -236,6 +237,15 @@ export async function renderJob(job, cfg, workDir, outFile) {
 
   if (narration || music) await muxAudio(silent, narration, music, outFile, total, cfg);
   else await fs.copyFile(silent, outFile);
+
+  // Auto thumbnail: a bold, professional 1280x720 image that matches the video.
+  if (cfg.thumbnails) {
+    try {
+      const thumbFile = outFile.replace(/\.(mp4|webm)$/i, "-thumbnail.jpg");
+      const t = await buildThumbnail(job, cfg, workDir, thumbFile, { fetchImage, run });
+      if (t) { job.thumbnailFile = thumbFile; cfg.log("  thumbnail: " + path.basename(thumbFile)); }
+    } catch (e) { cfg.log("  thumbnail skipped: " + e.message); }
+  }
 
   return outFile;
 }

@@ -109,10 +109,13 @@ jobs:
             git push || true
           fi
 
-      - name: Keep the finished videos as a download
+      - name: Keep the finished videos and thumbnails as a download
         if: always()
         uses: actions/upload-artifact@v4
         with:
           name: videos
-          path: output/*.mp4
+          path: |
+            output/*.mp4
+            output/*-thumbnail.jpg
+            output/*.txt
           if-no-files-found: ignore

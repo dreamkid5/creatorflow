@@ -68,5 +68,21 @@ export async function uploadToYouTube(file, job, cfg) {
   });
   if (!put.ok) throw new Error("upload failed: " + put.status + " " + (await put.text()).slice(0, 200));
   const j = await put.json();
-  return j.id;
+  const videoId = j.id;
+
+  // Set the generated thumbnail as the video's custom thumbnail, if we made one.
+  // Needs a channel that is allowed to set custom thumbnails; failures are non fatal.
+  if (videoId && job.thumbnailFile) {
+    try {
+      const img = await fs.readFile(job.thumbnailFile);
+      const th = await fetch("https://www.googleapis.com/upload/youtube/v3/thumbnails/set?videoId=" + videoId, {
+        method: "POST",
+        headers: { "Authorization": "Bearer " + token, "Content-Type": "image/jpeg", "Content-Length": String(img.length) },
+        body: img
+      });
+      if (th.ok) cfg.log("  custom thumbnail set");
+      else cfg.log("  thumbnail not set: " + th.status + " (channel may need to be verified)");
+    } catch (e) { cfg.log("  thumbnail not set: " + e.message); }
+  }
+  return videoId;
 }
