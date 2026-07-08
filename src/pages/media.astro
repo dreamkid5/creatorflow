@@ -62,7 +62,7 @@ const label = (s) => s.charAt(0).toUpperCase() + s.slice(1);
             </div>
           ))}
         </div>
-        <div class="empty-note" id="mediaEmpty" style="display:none;">No files of this type yet.</div>
+        <div class="empty-note" id="mediaEmpty" style={mediaItems.length ? "display:none;" : "display:block;"}>No files yet. Drag files onto the zones above, or use the upload buttons, to add your own.</div>
       </div>
     </div>
 
