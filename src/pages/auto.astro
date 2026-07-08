@@ -393,14 +393,25 @@ const premiumLabel = premiumProvider === "local" ? "Narrator, free local voice" 
     document.getElementById("genAll").addEventListener("click", runGenerate);
 
     // Split a pasted script into as many scenes as it has, with no limit
+    // Break a whole script into many scenes. It splits into sentences, then groups
+    // about one to two sentences per scene using a word target, so a long script
+    // produces lots of scenes rather than a few very long ones.
     function splitScriptFull(text) {
-      text = text.trim().replace(/[ \t]+/g, " ");
-      let parts = text.split(/\n\s*\n/).map((s) => s.trim().replace(/\n/g, " ")).filter(Boolean);
-      if (parts.length < 2) {
-        const sentences = text.replace(/\n/g, " ").match(/[^.!?]+[.!?]+/g);
-        if (sentences && sentences.length > 1) parts = sentences.map((s) => s.trim()).filter(Boolean);
+      text = text.trim().replace(/[ \t]+/g, " ").replace(/\n+/g, " ");
+      let sentences = text.match(/[^.!?]+[.!?]+/g);
+      if (!sentences || sentences.length < 2) sentences = text.split(/(?<=[.!?])\s+|\n+/);
+      sentences = sentences.map((s) => s.trim()).filter(Boolean);
+      const TARGET = 30; // words per scene, tune for how long each image shows
+      const parts = [];
+      let cur = "", words = 0;
+      for (const s of sentences) {
+        const w = s.split(/\s+/).filter(Boolean).length;
+        cur = cur ? cur + " " + s : s;
+        words += w;
+        if (words >= TARGET) { parts.push(cur); cur = ""; words = 0; }
       }
-      return parts;
+      if (cur) parts.push(cur);
+      return parts.length ? parts : [text];
     }
     document.getElementById("fillScenes").addEventListener("click", () => {
       const text = (document.getElementById("scriptPaste").value || "").trim();

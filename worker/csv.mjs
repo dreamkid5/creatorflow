@@ -72,20 +72,26 @@ export function jobsFromCSV(text) {
 }
 
 // Split a script into scenes by paragraph, or by sentence when it is one block.
+// Break a script into many scenes. It splits into sentences, then groups about
+// one to two sentences per scene using a word target, so a long script yields
+// lots of scenes rather than a few very long ones. Tunable with CF_SCENE_WORDS.
 export function splitScript(text) {
-  text = text.trim().replace(/[ \t]+/g, " ");
-  let parts = text.split(/\n\s*\n/).map((s) => s.trim().replace(/\n/g, " ")).filter(Boolean);
-  if (parts.length < 2) {
-    const sentences = text.replace(/\n/g, " ").match(/[^.!?]+[.!?]+/g);
-    if (sentences && sentences.length > 1) parts = sentences.map((s) => s.trim()).filter(Boolean);
+  text = text.trim().replace(/[ \t]+/g, " ").replace(/\n+/g, " ");
+  let sentences = text.match(/[^.!?]+[.!?]+/g);
+  if (!sentences || sentences.length < 2) sentences = text.split(/(?<=[.!?])\s+|\n+/);
+  sentences = sentences.map((s) => s.trim()).filter(Boolean);
+  const TARGET = Number(process.env.CF_SCENE_WORDS || 30); // words per scene
+  const parts = [];
+  let cur = "", words = 0;
+  for (const s of sentences) {
+    const w = s.split(/\s+/).filter(Boolean).length;
+    cur = cur ? cur + " " + s : s;
+    words += w;
+    if (words >= TARGET) { parts.push(cur); cur = ""; words = 0; }
   }
-  const MAX = 10;
-  if (parts.length > MAX) {
-    const grouped = [], per = Math.ceil(parts.length / MAX);
-    for (let i = 0; i < parts.length; i += per) grouped.push(parts.slice(i, i + per).join(" "));
-    parts = grouped;
-  }
-  return parts;
+  if (cur) parts.push(cur);
+  const MAX = Number(process.env.CF_MAX_SCENES || 500); // safety ceiling only
+  return parts.length ? parts.slice(0, MAX) : [text];
 }
 
 export function buildPrompt(scene, style) {
