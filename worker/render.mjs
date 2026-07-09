@@ -196,30 +196,60 @@ async function crossfadeConcat(clips, outPath, dur, TR, cfg) {
   return outPath;
 }
 
-// Lay narration and music under the finished visuals.
-function muxAudio(video, narration, music, outPath, total, cfg) {
-  const args = ["-y", "-i", video];
-  if (narration) args.push("-i", narration);
-  if (music) args.push("-stream_loop", "-1", "-i", music);
-  const nIdx = narration ? 1 : null;
-  const mIdx = music ? (narration ? 2 : 1) : null;
-  let filter = null, audioMap = null;
-  if (narration && music) {
-    filter = "[" + mIdx + ":a]volume=0.35[m];[" + nIdx + ":a][m]amix=inputs=2:duration=first:dropout_transition=0[aout]";
-    audioMap = "[aout]";
-  } else if (narration) {
-    audioMap = nIdx + ":a";
-  } else if (music) {
-    filter = "[" + mIdx + ":a]volume=0.5[aout]";
-    audioMap = "[aout]";
+// True only if the file has an audio stream.
+function hasAudioStream(file, cfg) {
+  return new Promise((res) => {
+    const p = spawn(cfg.ffprobe, ["-v", "error", "-select_streams", "a", "-show_entries", "stream=codec_type", "-of", "csv=p=0", file]);
+    let out = "";
+    p.stdout.on("data", (d) => { out += d.toString(); });
+    p.on("error", () => res(false));
+    p.on("close", () => res(out.includes("audio")));
+  });
+}
+
+// Lay narration and music under the finished visuals. A narrated documentary MUST
+// end up with audio, so this retries with a re-encode and then verifies the output
+// truly has an audio stream. If narration cannot be attached, it throws, and the
+// caller fails the video (to be retried) rather than ever saving a silent one.
+async function muxAudio(video, narration, music, outPath, total, cfg) {
+  function build(reencode) {
+    const args = ["-y", "-i", video];
+    if (narration) args.push("-i", narration);
+    if (music) args.push("-stream_loop", "-1", "-i", music);
+    const nIdx = narration ? 1 : null;
+    const mIdx = music ? (narration ? 2 : 1) : null;
+    let filter = null, audioMap = null;
+    if (narration && music) {
+      filter = "[" + mIdx + ":a]volume=0.35[m];[" + nIdx + ":a][m]amix=inputs=2:duration=first:dropout_transition=0[aout]";
+      audioMap = "[aout]";
+    } else if (narration) {
+      audioMap = nIdx + ":a";
+    } else if (music) {
+      filter = "[" + mIdx + ":a]volume=0.5[aout]";
+      audioMap = "[aout]";
+    }
+    if (filter) args.push("-filter_complex", filter);
+    args.push("-map", "0:v");
+    if (audioMap) args.push("-map", audioMap);
+    args.push("-c:v", reencode ? "libx264" : "copy");
+    if (reencode) args.push("-preset", "veryfast", "-crf", "23", "-pix_fmt", "yuv420p");
+    if (audioMap) args.push("-c:a", "aac", "-b:a", "160k");
+    args.push("-t", String(total), outPath);
+    return args;
   }
-  if (filter) args.push("-filter_complex", filter);
-  args.push("-map", "0:v");
-  if (audioMap) args.push("-map", audioMap);
-  args.push("-c:v", "copy");
-  if (audioMap) args.push("-c:a", "aac", "-b:a", "160k");
-  args.push("-t", String(total), outPath);
-  return run(cfg.ffmpeg, args);
+  try {
+    await run(cfg.ffmpeg, build(false));
+  } catch (e) {
+    cfg.log("  audio step retrying with a re-encode");
+    await run(cfg.ffmpeg, build(true));
+  }
+  const st = await fs.stat(outPath).catch(() => null);
+  if (!st || st.size < 1000) throw new Error("the audio step produced no output");
+  // a narrated video with no audio is useless, so treat that as a failure
+  if (narration && !(await hasAudioStream(outPath, cfg))) {
+    throw new Error("the narration did not attach to the video");
+  }
+  return outPath;
 }
 
 // ---------- orchestration ----------
@@ -295,13 +325,11 @@ export async function renderJob(job, cfg, workDir, outFile) {
   const silent = path.join(workDir, "silent.mp4");
   await crossfadeConcat(clips, silent, dur, TR, cfg);
 
-  try {
-    if (narration || music) await muxAudio(silent, narration, music, outFile, total, cfg);
-    else await fs.copyFile(silent, outFile);
-  } catch (e) {
-    cfg.log("  audio mux failed, saving the video without audio: " + String(e.message).slice(0, 90));
-    await fs.copyFile(silent, outFile);
-  }
+  // A narrated documentary must have its audio. If muxAudio cannot attach the
+  // narration it throws, and this whole video is treated as failed (not uploaded)
+  // so it gets retried, rather than ever saving or publishing a silent video.
+  if (narration || music) await muxAudio(silent, narration, music, outFile, total, cfg);
+  else await fs.copyFile(silent, outFile);
 
   // Auto thumbnail: a bold, professional 1280x720 image that matches the video.
   if (cfg.thumbnails) {
