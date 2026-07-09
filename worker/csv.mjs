@@ -77,20 +77,20 @@ export function jobsFromCSV(text) {
 // lots of scenes rather than a few very long ones. Tunable with CF_SCENE_WORDS.
 export function splitScript(text) {
   text = text.trim().replace(/[ \t]+/g, " ").replace(/\n+/g, " ");
-  let sentences = text.match(/[^.!?]+[.!?]+/g);
-  if (!sentences || sentences.length < 2) sentences = text.split(/(?<=[.!?])\s+|\n+/);
-  sentences = sentences.map((s) => s.trim()).filter(Boolean);
+  // break into clause level pieces at sentence enders AND commas, for fine control
+  let pieces = text.split(/(?<=[.!?,;:])\s+/).map((s) => s.trim()).filter(Boolean);
+  if (pieces.length < 2) pieces = text.split(/\n+/).map((s) => s.trim()).filter(Boolean);
   const TARGET = Number(process.env.CF_SCENE_WORDS || 30); // words per scene
   const parts = [];
   let cur = "", words = 0;
-  for (const s of sentences) {
-    const w = s.split(/\s+/).filter(Boolean).length;
-    cur = cur ? cur + " " + s : s;
+  for (const p of pieces) {
+    const w = p.split(/\s+/).filter(Boolean).length;
+    cur = cur ? cur + " " + p : p;
     words += w;
     if (words >= TARGET) { parts.push(cur); cur = ""; words = 0; }
   }
   if (cur) parts.push(cur);
-  const MAX = Number(process.env.CF_MAX_SCENES || 500); // safety ceiling only
+  const MAX = Number(process.env.CF_MAX_SCENES || 800); // safety ceiling only
   return parts.length ? parts.slice(0, MAX) : [text];
 }
 
