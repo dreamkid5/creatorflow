@@ -148,7 +148,9 @@ function kenBurnsClip(imgPath, outPath, dur, cfg, idx = 0) {
 // Join clips with clean hard cuts, no re-encode. Scales to any number of clips.
 async function fastConcat(clips, outPath, cfg) {
   const listFile = path.join(path.dirname(outPath), "concat_list.txt");
-  await fs.writeFile(listFile, clips.map((c) => "file '" + c.replace(/'/g, "'\\''") + "'").join("\n"));
+  // absolute paths so the concat demuxer resolves them correctly regardless of cwd
+  const lines = clips.map((c) => "file '" + path.resolve(c).replace(/'/g, "'\\''") + "'").join("\n");
+  await fs.writeFile(listFile, lines);
   return run(cfg.ffmpeg, ["-y", "-f", "concat", "-safe", "0", "-i", listFile, "-c", "copy", outPath]);
 }
 
@@ -219,16 +221,27 @@ export async function renderJob(job, cfg, workDir, outFile) {
     visuals = await buildSceneVisuals(scenes, bible, cfg);
     if (visuals) cfg.log("  scene matching: on (" + visuals.filter(Boolean).length + "/" + scenes.length + " scenes visualized)");
   }
+  // Build each scene's image prompt first (sequentially, so the character carry
+  // forward stays correct), then fetch the images several at a time for speed.
   const charState = { active: null };
+  const prompts = scenes.map((s, i) =>
+    (visuals && visuals[i]) ? visuals[i] : (s + sceneCharacterNote(s, bible, charState)));
 
-  const imgs = [];
-  for (let i = 0; i < scenes.length; i++) {
-    const p = path.join(workDir, "img" + i + ".jpg");
-    cfg.log("  scene " + (i + 1) + "/" + scenes.length + ": generating image");
-    // prefer the Claude visual prompt; otherwise use the narration text plus the character note
-    const sceneText = (visuals && visuals[i]) ? visuals[i] : (scenes[i] + sceneCharacterNote(scenes[i], bible, charState));
-    if (await fetchImage(buildPrompt(sceneText, style), 3000 + i * 7, p, cfg)) imgs.push(p);
+  const results = new Array(scenes.length).fill(null);
+  const CONC = Math.max(1, Number(process.env.CF_IMG_CONCURRENCY || 2));
+  let next = 0, done = 0;
+  async function imgWorker() {
+    while (true) {
+      const i = next++;
+      if (i >= scenes.length) return;
+      const p = path.join(workDir, "img" + i + ".jpg");
+      if (await fetchImage(buildPrompt(prompts[i], style), 3000 + i * 7, p, cfg)) results[i] = p;
+      done++;
+      if (done % 20 === 0 || done === scenes.length) cfg.log("  images " + done + "/" + scenes.length);
+    }
   }
+  await Promise.all(Array.from({ length: Math.min(CONC, scenes.length) }, imgWorker));
+  const imgs = results.filter(Boolean);
   if (!imgs.length) throw new Error("no images were generated");
 
   let narration = null, total = null;
