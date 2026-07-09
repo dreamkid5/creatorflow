@@ -147,16 +147,28 @@ function kenBurnsClip(imgPath, outPath, dur, cfg, idx = 0) {
 
 // Join clips with clean hard cuts, no re-encode. Scales to any number of clips.
 async function fastConcat(clips, outPath, cfg) {
+  // keep only clips that actually exist and are non trivial
+  const good = [];
+  for (const c of clips) { try { const st = await fs.stat(c); if (st.size > 1000) good.push(c); } catch (e) {} }
+  if (!good.length) throw new Error("no valid clips to join");
   const listFile = path.join(path.dirname(outPath), "concat_list.txt");
   // absolute paths so the concat demuxer resolves them correctly regardless of cwd
-  const lines = clips.map((c) => "file '" + path.resolve(c).replace(/'/g, "'\\''") + "'").join("\n");
-  await fs.writeFile(listFile, lines);
-  return run(cfg.ffmpeg, ["-y", "-f", "concat", "-safe", "0", "-i", listFile, "-c", "copy", outPath]);
+  await fs.writeFile(listFile, good.map((c) => "file '" + path.resolve(c).replace(/'/g, "'\\''") + "'").join("\n"));
+  try {
+    await run(cfg.ffmpeg, ["-y", "-f", "concat", "-safe", "0", "-i", listFile, "-c", "copy", outPath]);
+  } catch (e) {
+    // fallback: re-encode on join, which tolerates any small differences between clips
+    cfg.log("  fast join fell back to a re-encode");
+    await run(cfg.ffmpeg, ["-y", "-f", "concat", "-safe", "0", "-i", listFile, "-r", "30", "-c:v", "libx264", "-preset", "veryfast", "-crf", "23", "-pix_fmt", "yuv420p", outPath]);
+  }
+  const st = await fs.stat(outPath).catch(() => null);
+  if (!st || st.size < 1000) throw new Error("join produced no output");
+  return outPath;
 }
 
 // Chain the clips together. Crossfades for a handful of scenes; clean hard cuts
 // for many short scenes, which is fast, reliable, and the standard punchy look.
-function crossfadeConcat(clips, outPath, dur, TR, cfg) {
+async function crossfadeConcat(clips, outPath, dur, TR, cfg) {
   if (clips.length === 1) return run(cfg.ffmpeg, ["-y", "-i", clips[0], "-c", "copy", outPath]);
   const maxXfade = Number(process.env.CF_MAX_CROSSFADE || 60);
   if (clips.length > maxXfade) return fastConcat(clips, outPath, cfg);
@@ -172,7 +184,16 @@ function crossfadeConcat(clips, outPath, dur, TR, cfg) {
   }
   filter = filter.replace(/;$/, "");
   args.push("-filter_complex", filter, "-map", "[" + last + "]", "-r", "30", "-c:v", "libx264", "-preset", "veryfast", "-crf", "23", "-pix_fmt", "yuv420p", outPath);
-  return run(cfg.ffmpeg, args);
+  try {
+    await run(cfg.ffmpeg, args);
+  } catch (e) {
+    // if the crossfade graph ever errors, fall back to the simple, always-works join
+    cfg.log("  crossfade failed, using the simple join instead");
+    return fastConcat(clips, outPath, cfg);
+  }
+  const st = await fs.stat(outPath).catch(() => null);
+  if (!st || st.size < 1000) return fastConcat(clips, outPath, cfg);
+  return outPath;
 }
 
 // Lay narration and music under the finished visuals.
@@ -262,14 +283,25 @@ export async function renderJob(job, cfg, workDir, outFile) {
   const clips = [];
   for (let i = 0; i < imgs.length; i++) {
     const c = path.join(workDir, "clip" + i + ".mp4");
-    await kenBurnsClip(imgs[i], c, dur, cfg, i);
-    clips.push(c);
+    try {
+      await kenBurnsClip(imgs[i], c, dur, cfg, i);
+      const st = await fs.stat(c);
+      if (st.size > 1000) clips.push(c);
+    } catch (e) {
+      cfg.log("  scene clip " + (i + 1) + " skipped: " + String(e.message).slice(0, 90));
+    }
   }
+  if (!clips.length) throw new Error("no clips were rendered");
   const silent = path.join(workDir, "silent.mp4");
   await crossfadeConcat(clips, silent, dur, TR, cfg);
 
-  if (narration || music) await muxAudio(silent, narration, music, outFile, total, cfg);
-  else await fs.copyFile(silent, outFile);
+  try {
+    if (narration || music) await muxAudio(silent, narration, music, outFile, total, cfg);
+    else await fs.copyFile(silent, outFile);
+  } catch (e) {
+    cfg.log("  audio mux failed, saving the video without audio: " + String(e.message).slice(0, 90));
+    await fs.copyFile(silent, outFile);
+  }
 
   // Auto thumbnail: a bold, professional 1280x720 image that matches the video.
   if (cfg.thumbnails) {
