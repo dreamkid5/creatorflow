@@ -62,6 +62,8 @@ cfg.ttsEnabled = !!(cfg.localTtsUrl || cfg.azureKey || cfg.googleKey || cfg.elev
 cfg.seoEnabled = !!cfg.anthropicKey;
 // character consistency: on by default when a Claude key is set, disable with CF_CHARACTERS=0
 cfg.characters = process.env.CF_CHARACTERS === "0" ? false : true;
+// scene matching: Claude turns narration into visual prompts so images fit. CF_SCENE_VISUALS=0 to disable
+cfg.sceneVisuals = process.env.CF_SCENE_VISUALS === "0" ? false : true;
 // auto thumbnail: on by default, disable with CF_THUMBNAILS=0
 cfg.thumbnails = process.env.CF_THUMBNAILS === "0" ? false : true;
 cfg.font = process.env.CF_FONT || "";
@@ -172,6 +174,7 @@ async function main() {
   log("narration: " + (cfg.ttsEnabled ? "on, provider " + cfg.ttsProvider : "off (set AZURE_SPEECH_KEY, GOOGLE_TTS_KEY, ELEVENLABS_API_KEY, or TTS_API_KEY)"));
   log("seo: " + (cfg.seoEnabled ? "on, Claude writes titles, descriptions, and tags" : "off (set ANTHROPIC_API_KEY to enable)"));
   log("characters: " + (cfg.anthropicKey && cfg.characters ? "on, Claude keeps main characters consistent" : "off"));
+  log("scene matching: " + (cfg.anthropicKey && cfg.sceneVisuals ? "on, Claude matches each image to the narration" : "off"));
   log("thumbnails: " + (cfg.thumbnails ? "on, a bold thumbnail is made for each video" : "off"));
   log("youtube: " + (cfg.ytUpload ? "on, privacy " + cfg.ytPrivacy : "off (set YT_CLIENT_ID, YT_CLIENT_SECRET, YT_REFRESH_TOKEN to enable)"));
   await runOnce();

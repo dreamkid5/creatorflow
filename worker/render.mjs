@@ -6,6 +6,7 @@ import fs from "node:fs/promises";
 import path from "node:path";
 import { splitScript, buildPrompt, styleKeywords, VOICES } from "./csv.mjs";
 import { buildCharacterBible, sceneCharacterNote } from "./characters.mjs";
+import { buildSceneVisuals } from "./visuals.mjs";
 import { buildThumbnail } from "./thumbnail.mjs";
 
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
@@ -200,13 +201,22 @@ export async function renderJob(job, cfg, workDir, outFile) {
     bible = await buildCharacterBible(job.script, cfg);
     if (bible && bible.characters.length) cfg.log("  character bible: " + bible.characters.map((c) => c.name).join(", "));
   }
+
+  // Scene matching: turn each stretch of narration into a concrete VISUAL prompt so
+  // the image matches the meaning, not the literal words. Falls back to raw text.
+  let visuals = null;
+  if (cfg.anthropicKey && cfg.sceneVisuals !== false) {
+    visuals = await buildSceneVisuals(scenes, bible, cfg);
+    if (visuals) cfg.log("  scene matching: on (" + visuals.filter(Boolean).length + "/" + scenes.length + " scenes visualized)");
+  }
   const charState = { active: null };
 
   const imgs = [];
   for (let i = 0; i < scenes.length; i++) {
     const p = path.join(workDir, "img" + i + ".jpg");
     cfg.log("  scene " + (i + 1) + "/" + scenes.length + ": generating image");
-    const sceneText = scenes[i] + sceneCharacterNote(scenes[i], bible, charState);
+    // prefer the Claude visual prompt; otherwise use the narration text plus the character note
+    const sceneText = (visuals && visuals[i]) ? visuals[i] : (scenes[i] + sceneCharacterNote(scenes[i], bible, charState));
     if (await fetchImage(buildPrompt(sceneText, style), 3000 + i * 7, p, cfg)) imgs.push(p);
   }
   if (!imgs.length) throw new Error("no images were generated");
