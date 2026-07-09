@@ -145,9 +145,19 @@ function kenBurnsClip(imgPath, outPath, dur, cfg, idx = 0) {
   return run(cfg.ffmpeg, ["-y", "-loop", "1", "-t", String(dur), "-i", imgPath, "-vf", vf, "-r", "30", "-c:v", "libx264", "-preset", "veryfast", "-crf", "23", "-pix_fmt", "yuv420p", outPath]);
 }
 
-// Chain the clips together with crossfades.
+// Join clips with clean hard cuts, no re-encode. Scales to any number of clips.
+async function fastConcat(clips, outPath, cfg) {
+  const listFile = path.join(path.dirname(outPath), "concat_list.txt");
+  await fs.writeFile(listFile, clips.map((c) => "file '" + c.replace(/'/g, "'\\''") + "'").join("\n"));
+  return run(cfg.ffmpeg, ["-y", "-f", "concat", "-safe", "0", "-i", listFile, "-c", "copy", outPath]);
+}
+
+// Chain the clips together. Crossfades for a handful of scenes; clean hard cuts
+// for many short scenes, which is fast, reliable, and the standard punchy look.
 function crossfadeConcat(clips, outPath, dur, TR, cfg) {
   if (clips.length === 1) return run(cfg.ffmpeg, ["-y", "-i", clips[0], "-c", "copy", outPath]);
+  const maxXfade = Number(process.env.CF_MAX_CROSSFADE || 60);
+  if (clips.length > maxXfade) return fastConcat(clips, outPath, cfg);
   const args = ["-y"];
   clips.forEach((c) => args.push("-i", c));
   let filter = "", last = "";
