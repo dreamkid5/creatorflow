@@ -97,22 +97,16 @@ jobs:
           CF_OUTPUT: output
         run: node worker/watch.mjs --once
 
-      - name: Archive the scripts it just published
+      - name: Save the archived scripts back to the repo
+        if: always()
         run: |
-          shopt -s nullglob
-          moved=0
-          mkdir -p content/published
-          for f in content/*.txt; do
-            b=$(basename "$f")
-            case "$b" in _*) continue;; esac
-            mv "$f" "content/published/$b"; moved=1
-          done
-          if [ "$moved" = "1" ]; then
+          # the worker already moved only the successful scripts into content/published;
+          # commit whatever changed so any failed script stays in content and is retried
+          if [ -n "$(git status --porcelain content)" ]; then
             git config user.name "github-actions[bot]"
             git config user.email "github-actions[bot]@users.noreply.github.com"
             git add content
             git commit -m "Archive published scripts [skip ci]" || true
-            # pull then push, retrying, so processed scripts reliably leave the content folder
             for i in 1 2 3 4 5; do
               git pull --rebase --autostash -q origin main && git push -q origin main && break
               echo "archive push retry $i"; sleep 4

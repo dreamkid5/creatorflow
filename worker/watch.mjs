@@ -110,6 +110,7 @@ async function processCSV(file, processed) {
   if (!jobs.length) { log("no rows in " + file.name + ", skipping"); processed.add(file.key); await saveProcessed(processed); return; }
   log("processing " + file.name + " with " + jobs.length + " video(s)");
 
+  let fileOk = true;
   for (let i = 0; i < jobs.length; i++) {
     const job = jobs[i];
     const base = slug(job.title) || ("video_" + (i + 1));
@@ -145,13 +146,28 @@ async function processCSV(file, processed) {
           log("  uploaded to YouTube: https://youtu.be/" + id + " (" + cfg.ytPrivacy + ")");
         } catch (e) {
           log("  YouTube upload failed: " + e.message);
+          fileOk = false;
         }
       }
     } catch (e) {
       log("  failed: " + e.message);
+      fileOk = false;
     } finally {
       try { await fs.rm(workDir, { recursive: true, force: true }); } catch (e) {}
     }
+  }
+
+  // Archive only fully successful scripts. If a render or upload failed, keep the
+  // script in the content folder so it is retried on the next run, never lost.
+  if (fileOk) {
+    try {
+      const pub = path.join(cfg.input, "published");
+      await fs.mkdir(pub, { recursive: true });
+      await fs.rename(path.join(cfg.input, file.name), path.join(pub, file.name));
+      log("  archived " + file.name);
+    } catch (e) { log("  archive move failed: " + e.message); }
+  } else {
+    log("  kept " + file.name + " to retry next run (a step failed)");
   }
   processed.add(file.key);
   await saveProcessed(processed);
