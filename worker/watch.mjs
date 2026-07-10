@@ -196,7 +196,11 @@ async function main() {
   await runOnce();
   if (once) { log("done"); return; }
   log("watching, checking every " + cfg.interval + "s");
-  setInterval(() => { runOnce().catch((e) => log("run error: " + e.message)); }, cfg.interval * 1000);
+  // re-arm only after each run finishes, so a long render never overlaps the next check
+  const loop = () => runOnce()
+    .catch((e) => log("run error: " + e.message))
+    .finally(() => setTimeout(loop, cfg.interval * 1000));
+  setTimeout(loop, cfg.interval * 1000);
 }
 
 main().catch((e) => { console.error(e); process.exit(1); });

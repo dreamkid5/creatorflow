@@ -68,6 +68,7 @@ export async function uploadToYouTube(file, job, cfg) {
   });
   if (!put.ok) throw new Error("upload failed: " + put.status + " " + (await put.text()).slice(0, 200));
   const j = await put.json();
+  if (!j || !j.id) throw new Error("upload finished but YouTube returned no video id");
   const videoId = j.id;
 
   // Set the generated thumbnail as the video's custom thumbnail, if we made one.

@@ -306,7 +306,8 @@ export async function renderJob(job, cfg, workDir, outFile) {
   else if (cfg.music) music = cfg.music;
 
   const dur = total ? Math.max(2, total / imgs.length) : cfg.sceneSeconds;
-  total = total || imgs.length * cfg.sceneSeconds;
+  // never let the final length cut off the visuals (matters only if narration is very short)
+  total = Math.max(total || 0, imgs.length * dur);
   const TR = 0.6;
 
   cfg.log("  rendering " + imgs.length + " scenes with ffmpeg");
