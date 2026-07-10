@@ -86,10 +86,14 @@ async function saveProcessed(set) {
 
 async function listNewCSVs(processed) {
   const entries = await fs.readdir(cfg.input, { withFileTypes: true });
+  // names already rendered in a previous run, so we never make the same video twice
+  let done = new Set();
+  try { done = new Set(await fs.readdir(path.join(cfg.input, "published"))); } catch (e) {}
   const out = [];
   for (const e of entries) {
     if (!e.isFile() || !/\.(csv|txt)$/i.test(e.name)) continue;
     if (e.name.startsWith("_") || e.name.startsWith(".")) continue; // helper and hidden files
+    if (done.has(e.name)) continue; // already published, skip to avoid a duplicate
     const st = await fs.stat(path.join(cfg.input, e.name));
     const key = e.name + ":" + Math.round(st.mtimeMs);
     if (!processed.has(key)) out.push({ name: e.name, key });
