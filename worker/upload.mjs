@@ -29,6 +29,42 @@ function buildDescription(job, cfg) {
   return (base.length > 4500 ? base.slice(0, 4500) : base) + footer;
 }
 
+// The channel's uploads playlist holds every video, including private drafts.
+async function getUploadsPlaylist(token) {
+  const r = await fetch("https://www.googleapis.com/youtube/v3/channels?part=contentDetails&mine=true", {
+    headers: { "Authorization": "Bearer " + token }
+  });
+  if (!r.ok) return null;
+  const j = await r.json();
+  return (j.items && j.items[0] && j.items[0].contentDetails.relatedPlaylists.uploads) || null;
+}
+
+// Look through the most recent uploads for a video with this exact title.
+// Returns its video id if found, else null. Any failure returns null so the
+// upload still goes ahead: a rare duplicate is better than a missed video.
+async function findExistingUpload(token, title) {
+  try {
+    const pl = await getUploadsPlaylist(token);
+    if (!pl) return null;
+    const want = (title || "").trim().toLowerCase();
+    let pageToken = "";
+    for (let page = 0; page < 3; page++) { // scan up to the 150 newest uploads
+      const url = "https://www.googleapis.com/youtube/v3/playlistItems?part=snippet&maxResults=50&playlistId=" +
+        pl + (pageToken ? "&pageToken=" + pageToken : "");
+      const r = await fetch(url, { headers: { "Authorization": "Bearer " + token } });
+      if (!r.ok) return null;
+      const j = await r.json();
+      for (const it of (j.items || [])) {
+        const t = ((it.snippet && it.snippet.title) || "").trim().toLowerCase();
+        if (t && t === want) return (it.snippet.resourceId && it.snippet.resourceId.videoId) || null;
+      }
+      if (!j.nextPageToken) break;
+      pageToken = j.nextPageToken;
+    }
+  } catch (e) { /* fall through and upload normally */ }
+  return null;
+}
+
 export async function uploadToYouTube(file, job, cfg) {
   const token = await getAccessToken(cfg);
 
@@ -44,6 +80,15 @@ export async function uploadToYouTube(file, job, cfg) {
       selfDeclaredMadeForKids: false
     }
   };
+
+  // Permanent duplicate guard: if a video with this title is already on the
+  // channel, do not upload again. This makes a second copy impossible no matter
+  // what happens on the render side, and lets the worker archive the script.
+  const already = await findExistingUpload(token, meta.snippet.title);
+  if (already) {
+    cfg.log("  already on YouTube, skipping the upload: https://youtu.be/" + already);
+    return already;
+  }
 
   // Start a resumable upload session.
   const start = await fetch("https://www.googleapis.com/upload/youtube/v3/videos?uploadType=resumable&part=snippet,status", {
