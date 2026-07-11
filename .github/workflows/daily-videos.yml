@@ -81,6 +81,15 @@ jobs:
           for i in $(seq 1 20); do curl -sf http://localhost:5111 >/dev/null && break; sleep 1; done
           curl -s http://localhost:5111 >/dev/null || (echo "voice server did not start" && exit 1)
 
+      - name: Sync to the latest scripts
+        # A queued run froze its view of the content folder when it was triggered.
+        # Refresh to the newest commit right before rendering, so a run that waited
+        # in the queue sees scripts a previous run already published and skips them.
+        # This is what stops the same video being made and uploaded twice.
+        run: |
+          git fetch -q origin main
+          git reset --hard -q FETCH_HEAD
+
       - name: Render and publish
         env:
           LOCAL_TTS_URL: http://localhost:5111
