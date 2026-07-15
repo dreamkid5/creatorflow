@@ -166,6 +166,23 @@ async function fastConcat(clips, outPath, cfg) {
   return outPath;
 }
 
+// Join the per scene voice clips into one continuous narration track, in order.
+async function concatAudio(files, outPath, cfg) {
+  if (!files.length) throw new Error("no voice clips to join");
+  const listFile = path.join(path.dirname(outPath), "audio_list.txt");
+  await fs.writeFile(listFile, files.map((f) => "file '" + path.resolve(f).replace(/'/g, "'\\''") + "'").join("\n"));
+  await run(cfg.ffmpeg, ["-y", "-f", "concat", "-safe", "0", "-i", listFile, "-c:a", "libmp3lame", "-ar", "44100", "-ac", "1", outPath]);
+  const st = await fs.stat(outPath).catch(() => null);
+  if (!st || st.size < 200) throw new Error("joining the voice clips produced nothing");
+  return outPath;
+}
+
+// A short clip of pure silence. Used when one line's narration cannot be made,
+// so the picture track and the voice track stay the same length and in step.
+function silenceClip(outPath, dur, cfg) {
+  return run(cfg.ffmpeg, ["-y", "-f", "lavfi", "-t", String(Math.max(0.3, dur)), "-i", "anullsrc=r=22050:cl=mono", "-c:a", "pcm_s16le", outPath]);
+}
+
 // Chain the clips together. Crossfades for a handful of scenes; clean hard cuts
 // for many short scenes, which is fast, reliable, and the standard punchy look.
 async function crossfadeConcat(clips, outPath, dur, TR, cfg) {
@@ -292,30 +309,62 @@ export async function renderJob(job, cfg, workDir, outFile) {
     }
   }
   await Promise.all(Array.from({ length: Math.min(CONC, scenes.length) }, imgWorker));
-  const imgs = results.filter(Boolean);
-  if (!imgs.length) throw new Error("no images were generated");
+  const firstImg = results.find(Boolean);
+  if (!firstImg) throw new Error("no images were generated");
 
-  let narration = null, total = null;
-  if (cfg.ttsEnabled) {
-    const np = path.join(workDir, "voice.mp3");
-    if (await fetchTTS(job.script, job.voice, np, cfg)) { narration = np; total = await probeDuration(np, cfg); }
+  // Pair every scene with an image and its own narration line. If an image
+  // failed, reuse the previous one, so no narration is dropped and the pictures
+  // stay locked to the words.
+  const items = [];
+  let lastImg = firstImg;
+  for (let i = 0; i < scenes.length; i++) {
+    if (results[i]) lastImg = results[i];
+    items.push({ img: lastImg, text: scenes[i], dur: 0 });
   }
 
   let music = null;
   if (job.music) music = await fetchMusic(job.music, path.join(workDir, "music.bin"));
   else if (cfg.music) music = cfg.music;
 
-  const dur = total ? Math.max(2, total / imgs.length) : cfg.sceneSeconds;
-  // never let the final length cut off the visuals (matters only if narration is very short)
-  total = Math.max(total || 0, imgs.length * dur);
-  const TR = 0.6;
+  // Narration timed per scene. One short voice clip per line, measured, so each
+  // image is shown for exactly as long as its line is spoken. The clips are then
+  // joined into one continuous narration track. This is what keeps the scenes in
+  // sync with the voice instead of drifting.
+  let narration = null, total = null;
+  if (cfg.ttsEnabled) {
+    cfg.log("  narrating " + items.length + " lines, one voice clip each");
+    const voiceClips = [];
+    for (let i = 0; i < items.length; i++) {
+      const ap = path.join(workDir, "a" + i + ".wav");
+      let d = 0;
+      if (items[i].text && await fetchTTS(items[i].text, job.voice, ap, cfg)) d = await probeDuration(ap, cfg) || 0;
+      if (d <= 0) { await silenceClip(ap, cfg.sceneSeconds, cfg); d = await probeDuration(ap, cfg) || cfg.sceneSeconds; }
+      items[i].dur = d;
+      voiceClips.push(ap);
+    }
+    const np = path.join(workDir, "voice.mp3");
+    try { await concatAudio(voiceClips, np, cfg); narration = np; total = await probeDuration(np, cfg); }
+    catch (e) { cfg.log("  per scene voice join failed (" + e.message + "), using one narration"); }
+  }
+  // Fallback: a single whole script narration, split evenly, if per scene is off or failed.
+  if (cfg.ttsEnabled && !narration) {
+    const np = path.join(workDir, "voice.mp3");
+    if (await fetchTTS(job.script, job.voice, np, cfg)) {
+      narration = np; total = await probeDuration(np, cfg);
+      const each = Math.max(2, (total || items.length * cfg.sceneSeconds) / items.length);
+      items.forEach((it) => { it.dur = each; });
+    }
+  }
+  // No narration at all: fixed length per scene.
+  items.forEach((it) => { if (!it.dur || it.dur <= 0) it.dur = cfg.sceneSeconds; });
+  total = total || items.reduce((s, it) => s + it.dur, 0);
 
-  cfg.log("  rendering " + imgs.length + " scenes with ffmpeg");
+  cfg.log("  rendering " + items.length + " scenes with ffmpeg");
   const clips = [];
-  for (let i = 0; i < imgs.length; i++) {
+  for (let i = 0; i < items.length; i++) {
     const c = path.join(workDir, "clip" + i + ".mp4");
     try {
-      await kenBurnsClip(imgs[i], c, dur, cfg, i);
+      await kenBurnsClip(items[i].img, c, items[i].dur, cfg, i);
       const st = await fs.stat(c);
       if (st.size > 1000) clips.push(c);
     } catch (e) {
@@ -323,8 +372,10 @@ export async function renderJob(job, cfg, workDir, outFile) {
     }
   }
   if (!clips.length) throw new Error("no clips were rendered");
+  // Hard cuts, so every image stays pinned to its line. A crossfade would slide
+  // the pictures steadily earlier, which is the drift we are removing.
   const silent = path.join(workDir, "silent.mp4");
-  await crossfadeConcat(clips, silent, dur, TR, cfg);
+  await fastConcat(clips, silent, cfg);
 
   // A narrated documentary must have its audio. If muxAudio cannot attach the
   // narration it throws, and this whole video is treated as failed (not uploaded)
