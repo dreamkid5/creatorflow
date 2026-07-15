@@ -80,7 +80,15 @@ export function splitScript(text) {
   // break into clause level pieces at sentence enders AND commas, for fine control
   let pieces = text.split(/(?<=[.!?,;:])\s+/).map((s) => s.trim()).filter(Boolean);
   if (pieces.length < 2) pieces = text.split(/\n+/).map((s) => s.trim()).filter(Boolean);
-  const TARGET = Number(process.env.CF_SCENE_WORDS || 30); // words per scene
+  let TARGET = Number(process.env.CF_SCENE_WORDS || 30); // words per scene
+  // Safety budget: never make more images than can render inside the time limit.
+  // Images are the slow step, so on a very long script we widen the scene (more
+  // words each, fewer images) just enough to stay under the cap. Normal length
+  // videos are unaffected and keep the short scenes. This means a render can
+  // never run past the ceiling and get stuck retrying.
+  const totalWords = text.split(/\s+/).filter(Boolean).length;
+  const MAX_IMAGES = Number(process.env.CF_MAX_IMAGES || 400);
+  TARGET = Math.max(TARGET, Math.ceil(totalWords / MAX_IMAGES));
   const parts = [];
   let cur = "", words = 0;
   for (const p of pieces) {
