@@ -102,6 +102,7 @@ jobs:
           CF_THUMBNAILS: ${{ vars.CF_THUMBNAILS }}
           CF_SCENE_WORDS: ${{ vars.CF_SCENE_WORDS }}
           CF_STYLE: engraving
+          CF_SEO: "0"
           CF_INPUT: content
           CF_OUTPUT: output
         run: node worker/watch.mjs --once

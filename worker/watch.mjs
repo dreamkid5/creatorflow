@@ -59,7 +59,9 @@ const cfg = {
 cfg.ytUpload = process.env.CF_YT_UPLOAD === "0" ? false : !!(cfg.ytClientId && cfg.ytClientSecret && cfg.ytRefreshToken);
 cfg.ttsProvider = process.env.CF_TTS_PROVIDER || (cfg.localTtsUrl ? "local" : cfg.azureKey ? "azure" : cfg.googleKey ? "google" : cfg.elevenKey ? "elevenlabs" : "openai");
 cfg.ttsEnabled = !!(cfg.localTtsUrl || cfg.azureKey || cfg.googleKey || cfg.elevenKey || cfg.ttsKey);
-cfg.seoEnabled = !!cfg.anthropicKey;
+// SEO is off when CF_SEO=0 (user writes description and tags by hand). Scene
+// matching and character consistency are separate and stay on.
+cfg.seoEnabled = process.env.CF_SEO === "0" ? false : !!cfg.anthropicKey;
 // character consistency: on by default when a Claude key is set, disable with CF_CHARACTERS=0
 cfg.characters = process.env.CF_CHARACTERS === "0" ? false : true;
 // scene matching: Claude turns narration into visual prompts so images fit. CF_SCENE_VISUALS=0 to disable
