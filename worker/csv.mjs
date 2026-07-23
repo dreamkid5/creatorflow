@@ -2,6 +2,7 @@
 // Mirrors the Bulk Studio in the app so behavior stays consistent.
 
 export const styleKeywords = {
+  engraving: "classic 19th century engraved illustration, elegant crisp linework, balanced natural lighting, accurate lifelike faces and hands, sepia and cream tones, refined etching, clean and detailed",
   watercolor: "storybook illustration, clean bold ink outlines, flat soft watercolor fills, warm vivid palette, gentle cel shading, cream paper background with loose watercolor edges, editorial childrens book art, crisp and detailed, not photorealistic",
   cinematic: "cinematic photograph, dramatic lighting, film still, highly detailed, 35mm",
   storybook: "storybook painting, warm, painterly, whimsical",

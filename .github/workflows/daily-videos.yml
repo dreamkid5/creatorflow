@@ -101,7 +101,7 @@ jobs:
           CF_IMAGE_TOKEN: ${{ secrets.CF_IMAGE_TOKEN }}
           CF_THUMBNAILS: ${{ vars.CF_THUMBNAILS }}
           CF_SCENE_WORDS: ${{ vars.CF_SCENE_WORDS }}
-          CF_STYLE: watercolor
+          CF_STYLE: engraving
           CF_INPUT: content
           CF_OUTPUT: output
         run: node worker/watch.mjs --once
