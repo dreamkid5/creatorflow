@@ -43,19 +43,25 @@ export async function buildSceneVisuals(scenes, bible, cfg) {
     const batch = scenes.slice(start, start + BATCH);
     const numbered = batch.map((s, k) => (start + k + 1) + ". " + s).join("\n");
     const prompt =
-      "You are the visual director for a narrated history documentary illustrated in a watercolor and ink style.\n\n" +
+      "You are the visual director and cinematographer for a narrated history documentary.\n\n" +
       charBlock +
-      "Below are numbered narration segments. For EACH number, write ONE concrete visual image prompt describing what an illustrator should draw for that exact moment: a clear main subject, the setting, the action, and the mood, all matching the meaning of the narration. Rules:\n" +
+      "Below are numbered narration segments. For EACH number, write ONE concrete visual image prompt describing what an illustrator should draw for that exact moment: a clear main subject, the setting, the action, and the mood, all matching the meaning of the narration.\n\n" +
+      "Vary the SHOT TYPE from line to line like a real film edit. Choose whichever of these three best fits the moment, and do NOT use the same shot type several times in a row:\n" +
+      "- CLOSE UP: a single face or one key object in close detail. Use it for emotion, a reaction, a decision, a personal moment, or an important object.\n" +
+      "- FULL SHOT: one or a few figures shown full length, head to toe, doing something. Use it for action, movement, arriving, working, or fighting.\n" +
+      "- WIDE SHOT: a sweeping establishing view of a place, landscape, city, army, or battlefield. Use it for setting the scene, scale, context, and transitions.\n" +
+      "Start each prompt by naming the shot type in plain words, for example 'close up portrait of...', 'full body full length view of...', or 'wide establishing shot of...', so the framing is unmistakable.\n\n" +
+      "Rules:\n" +
       "- Translate the meaning into a picture. Do NOT just repeat the narration words.\n" +
       "- When a main character appears, describe them using their fixed look above.\n" +
-      "- For abstract, rhetorical, or transitional lines, pick a fitting symbolic or atmospheric image from the story's own world (a place, an object, a moment) rather than something literal.\n" +
+      "- For abstract, rhetorical, or transitional lines, pick a fitting symbolic or atmospheric image from the story's own world (often a WIDE view or an object CLOSE UP) rather than something literal.\n" +
       "- Never put on-screen text, captions, letters, or numbers in the image.\n" +
-      "- Keep each prompt vivid but under about 40 words.\n\n" +
+      "- Keep each prompt vivid but under about 45 words.\n\n" +
       "Return ONLY JSON covering every number in this batch, in this shape:\n" +
       '{"prompts":[{"n":<number>,"prompt":"..."}]}\n\n' +
       "Segments:\n" + numbered;
 
-    const text = await ask(cfg, prompt, 2200);
+    const text = await ask(cfg, prompt, 2600);
     const data = extractJSON(text);
     if (data && Array.isArray(data.prompts)) {
       for (const p of data.prompts) {
