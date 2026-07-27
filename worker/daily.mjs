@@ -5,7 +5,7 @@
 //   3. Move the finished MP4 files into a dated folder inside output.
 //
 // Point your cron at this file instead of watch.mjs to keep things tidy:
-//   0 3 * * * cd /path/to/worker && AZURE_SPEECH_KEY=... node daily.mjs >> worker.log 2>&1
+//   0 3 * * * cd /path/to/worker && node daily.mjs >> worker.log 2>&1
 
 import fs from "node:fs/promises";
 import path from "node:path";
@@ -44,7 +44,7 @@ async function runDaily() {
     log("no pending.csv, rendering any new CSV files in " + INPUT);
   }
 
-  // 2. run the worker once, passing through all env such as the voice key
+  // 2. run the worker once. Ava narration is locked in code and needs no key.
   log("rendering the day's batch");
   await new Promise((resolve) => {
     const child = spawn(process.execPath, ["watch.mjs", "--once"], { stdio: "inherit", env: process.env, cwd: process.cwd() });

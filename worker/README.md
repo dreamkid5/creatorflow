@@ -7,18 +7,20 @@ This is the unattended version of the Bulk Studio Watch folder feature.
 ## What it does
 
 1. Watches an input folder for CSV files
-2. For each new CSV, reads every row (title, script, style, voice, music)
-3. Splits each script into scenes and generates an illustration per scene
-4. Optionally generates a narration voiceover when a key is set
-5. Assembles a video with Ken Burns motion and crossfades, mixes narration and music
-6. Saves each finished MP4 to the output folder
+2. For each new CSV, reads every row (title, script, hook, style, music)
+3. Splits each script into exact narration segments and generates a matching photorealistic story image for each one
+4. Generates free neural narration with exact word timings
+5. Composites a consistent presenter on the left, moving story scenes on the right, and large highlighted captions
+6. Creates the matching hook-text thumbnail with the same presenter on the right
+7. Mixes optional music and saves a 1080p MP4
 
 No browser and no headless Chrome. All rendering is done by ffmpeg.
 
 ## Requirements
 
 * Node 18 or newer (uses the built in fetch, no npm install needed)
-* ffmpeg and ffprobe on your PATH. On a Mac: `brew install ffmpeg`
+* Python 3 with `edge-tts` and `Pillow`: `python3 -m pip install edge-tts pillow`
+* ffmpeg and ffprobe. Bundled Mac binaries in `worker/tools` are used automatically; Docker installs them too.
 
 ## Quick start
 
@@ -39,44 +41,65 @@ Then drop new CSV files into `input` and they render automatically.
 
 ## The CSV format
 
-Columns: `title, script, style, voice, music`. Only `script` is required.
+Columns: `title, script, hook, style, music`. Only `script` is required.
 
 ```
-title,script,style,voice,music
-"The Story of Valerian","In ancient Rome a weary man could not sleep...",watercolor,nova,
+title,script,hook,style,music
+"My Sister Sold Our House","My sister sold our house while I was caring for our mother...","My sister sold our house",story,
 ```
 
-* **style**: watercolor, cinematic, storybook, anime, 3d, or flat
-* **voice**: alloy, echo, fable, onyx, nova, or shimmer (used when narration is on)
+* **hook**: optional exact thumbnail copy; when blank, the opening hook is taken directly from the script
+* **style**: retained for compatibility; the production renderer always uses the storytime split-screen format
 * **music**: a direct URL to an audio file, mixed under the narration
 
 ## Narration
 
-Narration is off by default. Set one provider key to turn it on. The worker picks the provider from whichever key is set.
-
-For high volume, such as several videos a day, use Azure or Google, which both have large free tiers. The card each asks for at signup is only for identity and is not charged on the free tier.
-
-Azure, about 500 thousand characters a month free:
+Narration is permanently locked to the selected female Ava voice:
+`en-US-AvaMultilingualNeural`. It supplies exact word boundaries so the purple
+caption highlight follows the spoken word.
 
 ```
-AZURE_SPEECH_KEY=your-key AZURE_SPEECH_REGION=eastus CF_AZURE_VOICE=en-US-GuyNeural node watch.mjs --once
+python3 -m pip install edge-tts pillow
+node watch.mjs --once
 ```
 
-Google, about a million characters a month free, with Neural2 voices:
+Environment variables, CSV columns, provider settings, and caller input cannot
+override Ava. A legacy `voice` CSV column is accepted only so old files still
+parse; its value is ignored.
 
-```
-GOOGLE_TTS_KEY=your-key CF_GOOGLE_VOICE=en-US-Neural2-J node watch.mjs --once
-```
+The presenter is likewise locked to a white adult woman and is always composited
+on the left side of the frame. Every accepted presenter seed and image hash is
+saved in `output/.presenter-history.json`; duplicates are rejected and regenerated.
+The exact accepted image is reused in that video's thumbnail.
 
-For top quality on fewer videos, use ElevenLabs:
+## Locked captions and scene matching
 
-```
-ELEVENLABS_API_KEY=your-key CF_ELEVEN_VOICE=VR6AewLTigWG4xSOukaG node watch.mjs --once
-```
+The supplied reference video is the production template:
 
-An OpenAI compatible endpoint also works with `TTS_API_KEY`, tuned by `CF_TTS_URL`, `CF_TTS_MODEL`, and `CF_TTS_VOICE`.
+* presenter occupies 38% on the left; the story scene occupies the right
+* four uppercase words per caption phrase
+* Montserrat ExtraBold at 6% of frame height
+* white letters, thick black outline, purple active-word box
+* captions fixed at the same lower-centre position
 
-In a CSV, the `voice` column overrides the default per row. For Google use a voice name like `en-GB-Neural2-B`, and for ElevenLabs use a voice id.
+Each right-side image is generated from the exact narration segment attached to
+that scene. Segments target about 12 words, matching the short sentence-level
+changes in the reference. Each receives its own Ava clip and measured duration,
+so the image changes with the spoken segment rather than drifting on a generic timer.
+When Claude scene direction is available it refines that same segment; otherwise
+the segment itself is used as the image prompt.
+
+## Thumbnail
+
+Every video receives a 1280x720 thumbnail in the locked reference layout:
+
+* clean white copy panel on the left
+* large outlined hook text in purple, teal, orange, and pink
+* the exact same female presenter from the video on the right
+* no title, SEO headline, or AI-generated headline text
+
+Provide an explicit `hook` CSV value when available. Otherwise the worker uses
+the opening hook directly from the script and limits it to a readable 20 words.
 
 ## Settings (all optional)
 
@@ -84,14 +107,15 @@ In a CSV, the `voice` column overrides the default per row. For Google use a voi
 | :-- | :-- | :-- |
 | `CF_INPUT` | `./input` | Folder to watch for CSV files |
 | `CF_OUTPUT` | `./output` | Folder for finished videos |
-| `CF_STYLE` | `watercolor` | Default art style when a row leaves it blank |
-| `CF_SCENE_SECONDS` | `4` | Seconds per scene when there is no narration |
+| `CF_STYLE` | `story` | Default split-screen storytime format |
+| `CF_SCENE_SECONDS` | `4.2` | Seconds per scene when there is no narration |
+| `CF_WIDTH` / `CF_HEIGHT` | `1920` / `1080` | Output resolution |
+| Presenter panel | `38%` | Locked to the supplied reference |
+| Captions | Montserrat ExtraBold, four words, `6%` height | Locked to the supplied reference |
+| `CF_PRESENTER_HISTORY` | `output/.presenter-history.json` | Persistent never-repeat presenter registry |
 | `CF_IMAGE_BASE` | Pollinations prompt endpoint | Image model base URL |
 | `CF_IMAGE_MODEL` | `flux` | Image model name |
 | `CF_MUSIC` | empty | Path to a shared music file for rows without their own |
-| `TTS_API_KEY` | empty | Turns narration on |
-| `CF_TTS_URL` | OpenAI speech | Text to speech endpoint |
-| `CF_TTS_VOICE` | `nova` | Default voice |
 | `CF_INTERVAL` | `30` | Seconds between folder checks in watch mode |
 | `CF_FFMPEG` / `CF_FFPROBE` | `ffmpeg` / `ffprobe` | Binary names or paths |
 | `YT_CLIENT_ID` / `YT_CLIENT_SECRET` / `YT_REFRESH_TOKEN` | empty | Turn on YouTube upload |
@@ -140,7 +164,7 @@ Each upload logs its link. Uploads run per video, and a failed upload never stop
 Use `--once` from cron so each run processes new CSVs and exits. This example runs every 15 minutes:
 
 ```
-*/15 * * * * cd /path/to/worker && TTS_API_KEY=sk-your-key /usr/local/bin/node watch.mjs --once >> worker.log 2>&1
+*/15 * * * * cd /path/to/worker && /usr/local/bin/node watch.mjs --once >> worker.log 2>&1
 ```
 
 The worker remembers which CSV files it has already handled, so a repeating cron never renders the same file twice.

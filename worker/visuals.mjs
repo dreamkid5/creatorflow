@@ -28,7 +28,7 @@ async function ask(cfg, prompt, maxTokens) {
   return null;
 }
 
-export async function buildSceneVisuals(scenes, bible, cfg) {
+export async function buildSceneVisuals(scenes, bible, cfg, style = "") {
   if (!cfg.anthropicKey || !scenes.length) return null;
   const chars = (bible && bible.characters) || [];
   const charBlock = chars.length
@@ -42,19 +42,30 @@ export async function buildSceneVisuals(scenes, bible, cfg) {
   for (let start = 0; start < scenes.length; start += BATCH) {
     const batch = scenes.slice(start, start + BATCH);
     const numbered = batch.map((s, k) => (start + k + 1) + ". " + s).join("\n");
+    const storytime = style === "story";
+    const direction = storytime
+      ? "You are the visual director for a narrated first-person real-life storytime video about relationships, family, betrayal, revenge, or everyday drama. Every scene is a cinematic photorealistic photograph of modern real people in ordinary contemporary settings.\n\n"
+      : "You are the visual director and cinematographer for a narrated history documentary.\n\n";
+    const storyRules = storytime
+      ? "- Be literal, modern, and realistic: show the actual people, place, object, action, and emotion described.\n" +
+        "- Use present-day clothing and familiar settings such as homes, kitchens, offices, cafes, cars, hospitals, and courtrooms.\n" +
+        "- Show believable emotion in faces and body language, with soft cinematic light and shallow depth of field.\n" +
+        "- For abstract or transitional lines, use a concrete detail from the same modern story world, such as a phone face-down, a letter, an empty chair, a rainy window, or an open door.\n"
+      : "";
     const prompt =
-      "You are the visual director and cinematographer for a narrated history documentary.\n\n" +
+      direction +
       charBlock +
-      "Below are numbered narration segments. For EACH number, write ONE concrete visual image prompt describing what an illustrator should draw for that exact moment: a clear main subject, the setting, the action, and the mood, all matching the meaning of the narration.\n\n" +
+      "Below are numbered narration segments. For EACH number, write ONE concrete visual image prompt for that exact moment: a clear main subject, setting, action, and mood, all matching the meaning of the narration.\n\n" +
       "Vary the SHOT TYPE from line to line like a real film edit. Choose whichever of these three best fits the moment, and do NOT use the same shot type several times in a row:\n" +
       "- CLOSE UP: a single face or one key object in close detail. Use it for emotion, a reaction, a decision, a personal moment, or an important object.\n" +
       "- FULL SHOT: one or a few figures shown full length, head to toe, doing something. Use it for action, movement, arriving, working, or fighting.\n" +
       "- WIDE SHOT: a sweeping establishing view of a place, landscape, city, army, or battlefield. Use it for setting the scene, scale, context, and transitions.\n" +
       "Start each prompt by naming the shot type in plain words, for example 'close up portrait of...', 'full body full length view of...', or 'wide establishing shot of...', so the framing is unmistakable.\n\n" +
       "Rules:\n" +
+      storyRules +
       "- Translate the meaning into a picture. Do NOT just repeat the narration words.\n" +
       "- When a main character appears, describe them using their fixed look above.\n" +
-      "- For abstract, rhetorical, or transitional lines, pick a fitting symbolic or atmospheric image from the story's own world (often a WIDE view or an object CLOSE UP) rather than something literal.\n" +
+      (storytime ? "" : "- For abstract, rhetorical, or transitional lines, pick a fitting symbolic or atmospheric image from the story's own world (often a WIDE view or an object CLOSE UP) rather than something literal.\n") +
       "- Never put on-screen text, captions, letters, or numbers in the image.\n" +
       "- Keep each prompt vivid but under about 45 words.\n\n" +
       "Return ONLY JSON covering every number in this batch, in this shape:\n" +

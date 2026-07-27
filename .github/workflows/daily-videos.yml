@@ -11,17 +11,7 @@ on:
       - "content/**"
   schedule:
     - cron: "0 7 * * *"   # every day at 07:00 UTC. Change the time to suit you.
-  workflow_dispatch:       # run by hand from the Actions tab, with a voice picker
-    inputs:
-      voice:
-        description: "Narrator voice"
-        type: choice
-        default: "British documentary (Alan)"
-        options:
-          - "British documentary (Alan)"
-          - "American warm (Lessac)"
-          - "British northern male"
-          - "American clear (Ryan)"
+  workflow_dispatch:       # run by hand from the Actions tab
 
 permissions:
   contents: write          # so it can archive published scripts back to the repo
@@ -43,43 +33,8 @@ jobs:
       - name: Make sure ffmpeg is present
         run: ffmpeg -version >/dev/null 2>&1 || (sudo apt-get update && sudo apt-get install -y ffmpeg)
 
-      - name: Cache the Piper voices
-        uses: actions/cache@v4
-        with:
-          path: voice-server/voices
-          key: piper-voices
-
-      - name: Install the Piper voice engine
-        env:
-          # manual runs pass a voice; scheduled runs use the CF_VOICE repo variable, else Alan
-          VOICE: ${{ github.event.inputs.voice || vars.CF_VOICE || 'British documentary (Alan)' }}
-        run: |
-          python3 -m venv "$HOME/piper-venv"
-          "$HOME/piper-venv/bin/pip" install --quiet --upgrade pip piper-tts
-          mkdir -p voice-server/voices
-          case "$VOICE" in
-            *[Ll]essac*|en_US-lessac-high) model="en_US-lessac-high";;
-            *[Nn]orthern*|en_GB-northern_english_male-medium) model="en_GB-northern_english_male-medium";;
-            *[Rr]yan*|en_US-ryan-high) model="en_US-ryan-high";;
-            *) model="en_GB-alan-medium";;
-          esac
-          locale="${model%%-*}"; rest="${model#*-}"; voice="${rest%-*}"; quality="${rest##*-}"
-          top="$(echo "${locale%%_*}" | tr '[:upper:]' '[:lower:]')"
-          base="https://huggingface.co/rhasspy/piper-voices/resolve/main/${top}/${locale}/${voice}/${quality}"
-          if [ ! -f "voice-server/voices/${model}.onnx" ]; then
-            curl -sL -o "voice-server/voices/${model}.onnx" "${base}/${model}.onnx"
-            curl -sL -o "voice-server/voices/${model}.onnx.json" "${base}/${model}.onnx.json"
-          fi
-          echo "Narrator voice: $model"
-          echo "VOICE_MODEL=$PWD/voice-server/voices/${model}.onnx" >> "$GITHUB_ENV"
-
-      - name: Start the voice server
-        run: |
-          PIPER_CMD="$HOME/piper-venv/bin/python" \
-          PIPER_MODEL="$VOICE_MODEL" \
-          PORT=5111 node voice-server/server.mjs &
-          for i in $(seq 1 20); do curl -sf http://localhost:5111 >/dev/null && break; sleep 1; done
-          curl -s http://localhost:5111 >/dev/null || (echo "voice server did not start" && exit 1)
+      - name: Install the storytime voice and caption engine
+        run: python3 -m pip install --quiet edge-tts pillow
 
       - name: Sync to the latest scripts
         # A queued run froze its view of the content folder when it was triggered.
@@ -90,18 +45,23 @@ jobs:
           git fetch -q origin main
           git reset --hard -q FETCH_HEAD
 
+      - name: Restore the never-repeat presenter history
+        uses: actions/cache@v4
+        with:
+          path: output/.presenter-history.json
+          key: presenter-history-${{ github.run_id }}
+          restore-keys: |
+            presenter-history-
+
       - name: Render and publish
         env:
-          LOCAL_TTS_URL: http://localhost:5111
           ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
           YT_CLIENT_ID: ${{ secrets.YT_CLIENT_ID }}
           YT_CLIENT_SECRET: ${{ secrets.YT_CLIENT_SECRET }}
           YT_REFRESH_TOKEN: ${{ secrets.YT_REFRESH_TOKEN }}
           CF_YT_PRIVACY: ${{ secrets.CF_YT_PRIVACY || 'private' }}
           CF_IMAGE_TOKEN: ${{ secrets.CF_IMAGE_TOKEN }}
-          CF_THUMBNAILS: ${{ vars.CF_THUMBNAILS }}
-          CF_SCENE_WORDS: ${{ vars.CF_SCENE_WORDS }}
-          CF_STYLE: engraving
+          CF_STYLE: story
           CF_SEO: "0"
           CF_INPUT: content
           CF_OUTPUT: output
