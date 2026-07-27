@@ -4,12 +4,32 @@
 import { spawn } from "node:child_process";
 import fs from "node:fs/promises";
 import path from "node:path";
-import { splitScript, buildPrompt, styleKeywords, VOICES } from "./csv.mjs";
+import { fileURLToPath } from "node:url";
+import { splitScript, buildPrompt } from "./csv.mjs";
 import { buildCharacterBible, sceneCharacterNote } from "./characters.mjs";
 import { buildSceneVisuals } from "./visuals.mjs";
 import { buildThumbnail } from "./thumbnail.mjs";
+import {
+  loadPresenterHistory,
+  presenterHash,
+  presenterSeed,
+  presenterWasUsed,
+  recordPresenter,
+  savePresenterHistory
+} from "./presenter.mjs";
+import {
+  LOCKED_VOICE,
+  LOCKED_VOICE_PITCH,
+  LOCKED_VOICE_RATE
+} from "./voice.mjs";
 
+const HERE = path.dirname(fileURLToPath(import.meta.url));
+const FONTS_DIR = path.join(HERE, "assets", "fonts");
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+
+function ffEscapePath(value) {
+  return value.replace(/\\/g, "\\\\").replace(/:/g, "\\:").replace(/'/g, "\\'");
+}
 
 function run(cmd, args) {
   return new Promise((res, rej) => {
@@ -32,10 +52,15 @@ function probeDuration(file, cfg) {
 }
 
 // ---------- asset fetching ----------
-async function fetchImage(prompt, seed, outPath, cfg) {
+async function fetchImage(prompt, seed, outPath, cfg, opts = {}) {
   const token = cfg.imageToken ? "&token=" + encodeURIComponent(cfg.imageToken) : "";
-  const url = cfg.imageBase + "/" + encodeURIComponent(prompt) + "?width=1280&height=720&nologo=true&model=" + cfg.imageModel + "&seed=" + seed + token;
+  const width = Number(opts.width) || Number(cfg.width) || 1920;
+  const height = Number(opts.height) || Number(cfg.height) || 1080;
   for (let attempt = 0; attempt < 6; attempt++) {
+    const attemptSeed = seed + attempt * 104729;
+    const url = cfg.imageBase + "/" + encodeURIComponent(prompt) +
+      "?width=" + width + "&height=" + height + "&nologo=true&model=" +
+      cfg.imageModel + "&seed=" + attemptSeed + token;
     try {
       const r = await fetch(url);
       if (r.ok) {
@@ -53,71 +78,29 @@ async function fetchImage(prompt, seed, outPath, cfg) {
   return false;
 }
 
-function xmlEscape(s) {
-  return String(s).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;").replace(/'/g, "&apos;");
-}
-
-async function fetchTTS(script, voice, outPath, cfg) {
+async function fetchTTS(script, outPath, cfg) {
   try {
-    // Local voice server: free, no card, no key, runs on your machine
-    if (cfg.ttsProvider === "local" && cfg.localTtsUrl) {
-      const r = await fetch(cfg.localTtsUrl, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ text: script }) });
-      if (r.ok && (r.headers.get("content-type") || "").includes("audio")) { await fs.writeFile(outPath, Buffer.from(await r.arrayBuffer())); return true; }
-      return false;
+    const textFile = outPath + ".txt";
+    const wordsFile = outPath + ".words.json";
+    await fs.writeFile(textFile, script);
+    try {
+      await run(cfg.edgeCmd || "python3", [
+        path.join(HERE, "tts_words.py"),
+        textFile,
+        LOCKED_VOICE,
+        outPath,
+        wordsFile,
+        LOCKED_VOICE_RATE,
+        LOCKED_VOICE_PITCH
+      ]);
+    } finally {
+      await fs.rm(textFile, { force: true }).catch(() => {});
     }
-    // Azure Speech: 500k characters a month free, no card needed
-    if (cfg.ttsProvider === "azure" && cfg.azureKey) {
-      const name = voice || cfg.azureVoice;
-      const lang = name.slice(0, 5);
-      const ssml = "<speak version='1.0' xml:lang='" + lang + "'><voice xml:lang='" + lang + "' name='" + name + "'>" + xmlEscape(script) + "</voice></speak>";
-      const r = await fetch("https://" + cfg.azureRegion + ".tts.speech.microsoft.com/cognitiveservices/v1", {
-        method: "POST",
-        headers: {
-          "Ocp-Apim-Subscription-Key": cfg.azureKey,
-          "Content-Type": "application/ssml+xml",
-          "X-Microsoft-OutputFormat": "audio-24khz-48kbitrate-mono-mp3",
-          "User-Agent": "creatorflow-worker"
-        },
-        body: ssml
-      });
-      if (r.ok) { await fs.writeFile(outPath, Buffer.from(await r.arrayBuffer())); return true; }
-      return false;
-    }
-    // Google Cloud Text to Speech: large free tier, great for volume
-    if (cfg.ttsProvider === "google" && cfg.googleKey) {
-      const name = voice || cfg.googleVoice;
-      const lang = name.slice(0, 5);
-      const r = await fetch("https://texttospeech.googleapis.com/v1/text:synthesize?key=" + cfg.googleKey, {
-        method: "POST", headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ input: { text: script }, voice: { languageCode: lang, name }, audioConfig: { audioEncoding: "MP3" } })
-      });
-      if (r.ok) { const j = await r.json(); if (j.audioContent) { await fs.writeFile(outPath, Buffer.from(j.audioContent, "base64")); return true; } }
-      return false;
-    }
-    // ElevenLabs: top quality, smaller free tier
-    if (cfg.ttsProvider === "elevenlabs" && cfg.elevenKey) {
-      const voiceId = voice && /^[A-Za-z0-9]{16,}$/.test(voice) ? voice : cfg.elevenVoice;
-      const r = await fetch("https://api.elevenlabs.io/v1/text-to-speech/" + voiceId, {
-        method: "POST",
-        headers: { "Content-Type": "application/json", "xi-api-key": cfg.elevenKey, "Accept": "audio/mpeg" },
-        body: JSON.stringify({ text: script, model_id: "eleven_multilingual_v2" })
-      });
-      if (r.ok && (r.headers.get("content-type") || "").includes("audio")) { await fs.writeFile(outPath, Buffer.from(await r.arrayBuffer())); return true; }
-      return false;
-    }
-    // OpenAI compatible
-    if (cfg.ttsKey) {
-      const v = VOICES.includes((voice || "").toLowerCase()) ? voice.toLowerCase() : cfg.ttsVoice;
-      const r = await fetch(cfg.ttsUrl, {
-        method: "POST",
-        headers: { "Content-Type": "application/json", "Authorization": "Bearer " + cfg.ttsKey },
-        body: JSON.stringify({ model: cfg.ttsModel, voice: v, input: script, response_format: "mp3" })
-      });
-      const ct = r.headers.get("content-type") || "";
-      if (r.ok && ct.includes("audio")) { await fs.writeFile(outPath, Buffer.from(await r.arrayBuffer())); return true; }
-    }
-  } catch (e) { /* skip narration */ }
-  return false;
+    const stat = await fs.stat(outPath).catch(() => null);
+    return !!(stat && stat.size > 1000);
+  } catch (e) {
+    return false;
+  }
 }
 
 async function fetchMusic(url, outPath) {
@@ -132,17 +115,125 @@ async function fetchMusic(url, outPath) {
 }
 
 // ---------- ffmpeg steps ----------
-// A single still becomes a gently zooming clip (Ken Burns).
-// Uses a scale based zoom rather than the zoompan filter, which is dozens of
-// times faster, so videos with many scenes render in minutes, not hours.
-// The zoom direction alternates per scene for variety.
-function kenBurnsClip(imgPath, outPath, dur, cfg, idx = 0) {
+function kenBurnsVfSize(dur, cfg, idx, width, height) {
   const D = Math.max(0.1, dur);
-  const z = (idx % 2 === 0) ? "(1+0.12*t/" + D + ")" : "(1.12-0.12*t/" + D + ")";
-  const vf =
-    "scale=1280:720:force_original_aspect_ratio=increase,crop=1280:720," +
-    "scale=w='1280*" + z + "':h='720*" + z + "':eval=frame,crop=1280:720,format=yuv420p";
-  return run(cfg.ffmpeg, ["-y", "-loop", "1", "-t", String(dur), "-i", imgPath, "-vf", vf, "-r", "30", "-c:v", "libx264", "-preset", "veryfast", "-crf", "23", "-pix_fmt", "yuv420p", outPath]);
+  const zoom = Math.min(0.2, Math.max(0, Number(cfg.zoom) || 0.06));
+  const high = (1 + zoom).toFixed(3);
+  const z = idx % 2 === 0
+    ? "(1+" + zoom + "*t/" + D + ")"
+    : "(" + high + "-" + zoom + "*t/" + D + ")";
+  return "scale=" + width + ":" + height +
+    ":force_original_aspect_ratio=increase,crop=" + width + ":" + height + "," +
+    "scale=w='" + width + "*" + z + "':h='" + height + "*" + z +
+    "':eval=frame,crop=" + width + ":" + height + ",setsar=1";
+}
+
+function kenBurnsVf(dur, cfg, idx) {
+  return kenBurnsVfSize(
+    dur,
+    cfg,
+    idx,
+    Number(cfg.width) || 1920,
+    Number(cfg.height) || 1080
+  ) + ",format=yuv420p";
+}
+
+function kenBurnsClip(imgPath, outPath, dur, cfg, idx = 0) {
+  return run(cfg.ffmpeg, [
+    "-y", "-loop", "1", "-t", String(dur), "-i", imgPath,
+    "-vf", kenBurnsVf(dur, cfg, idx),
+    "-r", "30", "-c:v", "libx264", "-preset", "veryfast",
+    "-crf", String(Number(cfg.crf) || 20), "-pix_fmt", "yuv420p", outPath
+  ]);
+}
+
+function presenterVf(dur, cfg, idx, width, height) {
+  const zoom = Math.min(0.12, Math.max(0, Number(cfg.presenterZoom) || 0));
+  if (!zoom) {
+    return "scale=" + width + ":" + height +
+      ":force_original_aspect_ratio=increase,crop=" + width + ":" + height + ",setsar=1";
+  }
+  return kenBurnsVfSize(dur, { ...cfg, zoom }, idx, width, height);
+}
+
+// Presenter on the left, narration-matched scene on the right, and highlighted
+// captions across the full frame. Each scene carries its own audio to prevent drift.
+function storySceneClip(presenter, story, audio, captions, outPath, dur, cfg, idx = 0) {
+  const width = Number(cfg.width) || 1920;
+  const height = Number(cfg.height) || 1080;
+  const presenterWidth = Math.round(width * 0.38);
+  const storyWidth = width - presenterWidth;
+  const args = ["-y"];
+  if (presenter) args.push("-loop", "1", "-t", String(dur), "-i", presenter);
+  args.push("-loop", "1", "-t", String(dur), "-i", story);
+  const audioIndex = presenter ? 2 : 1;
+  if (audio) args.push("-i", audio);
+  else args.push(
+    "-f", "lavfi", "-t", String(dur), "-i",
+    "anullsrc=channel_layout=mono:sample_rate=24000"
+  );
+
+  const subtitleFilter = captions
+    ? ",subtitles='" + ffEscapePath(captions) + "':fontsdir='" + ffEscapePath(FONTS_DIR) + "'"
+    : "";
+  let filter;
+  if (presenter) {
+    filter =
+      "[0:v]" + presenterVf(dur, cfg, idx, presenterWidth, height) + "[left];" +
+      "[1:v]" + kenBurnsVfSize(dur, cfg, idx, storyWidth, height) + "[right];" +
+      "[left][right]hstack=inputs=2,format=yuv420p" + subtitleFilter + "[video]";
+  } else {
+    filter = "[0:v]" + kenBurnsVf(dur, cfg, idx) + subtitleFilter + "[video]";
+  }
+  args.push(
+    "-filter_complex", filter,
+    "-map", "[video]", "-map", audioIndex + ":a:0",
+    "-r", "30", "-c:v", "libx264", "-preset", "veryfast",
+    "-crf", String(Number(cfg.crf) || 20), "-pix_fmt", "yuv420p",
+    "-c:a", "aac", "-b:a", "160k", "-ar", "24000", "-ac", "1",
+    "-t", String(dur), outPath
+  );
+  return run(cfg.ffmpeg, args);
+}
+
+async function findCaptionFont(cfg) {
+  const locked = {
+    path: path.join(FONTS_DIR, "Montserrat-ExtraBold.ttf"),
+    family: "Montserrat ExtraBold"
+  };
+  return await fs.stat(locked.path).catch(() => null) ? locked : null;
+}
+
+async function buildSceneCaptions(wordsFile, assPath, cfg) {
+  const font = await findCaptionFont(cfg);
+  if (!font) throw new Error("no caption font found");
+  const width = Number(cfg.width) || 1920;
+  const height = Number(cfg.height) || 1080;
+  const fontSize = Math.round(height * 0.06);
+  await run(cfg.edgeCmd || "python3", [
+    path.join(HERE, "captions.py"),
+    wordsFile,
+    assPath,
+    String(width),
+    String(height),
+    font.path,
+    font.family,
+    String(fontSize),
+    "#7B14D1",
+    "4",
+    "0.72"
+  ]);
+}
+
+async function mixMusicUnder(video, music, total, outPath, cfg) {
+  await run(cfg.ffmpeg, [
+    "-y", "-i", video, "-stream_loop", "-1", "-i", music,
+    "-filter_complex",
+    "[1:a]volume=0.28[music];[0:a][music]amix=inputs=2:duration=first:dropout_transition=0[audio]",
+    "-map", "0:v", "-map", "[audio]", "-c:v", "copy",
+    "-c:a", "aac", "-b:a", "160k", "-t", String(total), outPath
+  ]);
+  return outPath;
 }
 
 // Join clips with clean hard cuts, no re-encode. Scales to any number of clips.
@@ -159,7 +250,7 @@ async function fastConcat(clips, outPath, cfg) {
   } catch (e) {
     // fallback: re-encode on join, which tolerates any small differences between clips
     cfg.log("  fast join fell back to a re-encode");
-    await run(cfg.ffmpeg, ["-y", "-f", "concat", "-safe", "0", "-i", listFile, "-r", "30", "-c:v", "libx264", "-preset", "veryfast", "-crf", "23", "-pix_fmt", "yuv420p", outPath]);
+    await run(cfg.ffmpeg, ["-y", "-f", "concat", "-safe", "0", "-i", listFile, "-r", "30", "-c:v", "libx264", "-preset", "veryfast", "-crf", String(Number(cfg.crf) || 20), "-pix_fmt", "yuv420p", "-c:a", "aac", "-b:a", "160k", outPath]);
   }
   const st = await fs.stat(outPath).catch(() => null);
   if (!st || st.size < 1000) throw new Error("join produced no output");
@@ -273,7 +364,44 @@ async function muxAudio(video, narration, music, outPath, total, cfg) {
 export async function renderJob(job, cfg, workDir, outFile) {
   await fs.mkdir(workDir, { recursive: true });
   const scenes = splitScript(job.script);
-  const style = styleKeywords[job.style] ? job.style : cfg.style;
+  const style = "story";
+  const storyMode = true;
+
+  let presenter = null;
+  if (storyMode) {
+    const description =
+      "one friendly relatable white adult woman in her early thirties, clearly European appearance, unmistakably female, natural shoulder-length hair, plain soft grey modern top, no man, no male person";
+    const prompt = "cinematic photorealistic upper body portrait of " + description +
+      ", warm genuine calm expression, facing the camera, soft natural indoor lighting, " +
+      "softly blurred cosy home background, shallow depth of field, 35mm, highly detailed " +
+      "realistic skin and face, centered head and shoulders, not an illustration";
+    const presenterPath = path.join(workDir, "presenter.jpg");
+    const history = await loadPresenterHistory(cfg.presenterHistory);
+    const startNonce = history.nextNonce;
+    for (let attempt = 0; attempt < 20 && !presenter; attempt++) {
+      const nonce = startNonce + attempt;
+      const seed = presenterSeed(job, nonce);
+      const generated = await fetchImage(prompt, seed, presenterPath, cfg, {
+        width: 768,
+        height: 1024
+      });
+      if (!generated) continue;
+      const hash = await presenterHash(presenterPath);
+      if (presenterWasUsed(history, seed, hash)) {
+        cfg.log("  presenter duplicate rejected; generating another woman");
+        continue;
+      }
+      presenter = presenterPath;
+      job.presenterFile = presenterPath;
+      job.presenterSeed = seed;
+      recordPresenter(history, job, seed, hash, nonce);
+      await savePresenterHistory(cfg.presenterHistory, history);
+    }
+    if (!presenter) {
+      throw new Error("white female presenter generation failed; refusing to render without the required left presenter");
+    }
+    cfg.log("  presenter: ready (white woman, left panel)");
+  }
 
   // Character bible: keep the main characters looking the same across scenes.
   let bible = null;
@@ -286,7 +414,7 @@ export async function renderJob(job, cfg, workDir, outFile) {
   // the image matches the meaning, not the literal words. Falls back to raw text.
   let visuals = null;
   if (cfg.anthropicKey && cfg.sceneVisuals !== false) {
-    visuals = await buildSceneVisuals(scenes, bible, cfg);
+    visuals = await buildSceneVisuals(scenes, bible, cfg, style);
     if (visuals) cfg.log("  scene matching: on (" + visuals.filter(Boolean).length + "/" + scenes.length + " scenes visualized)");
   }
   // Build each scene's image prompt first (sequentially, so the character carry
@@ -319,7 +447,7 @@ export async function renderJob(job, cfg, workDir, outFile) {
   let lastImg = firstImg;
   for (let i = 0; i < scenes.length; i++) {
     if (results[i]) lastImg = results[i];
-    items.push({ img: lastImg, text: scenes[i], dur: 0 });
+    items.push({ img: lastImg, text: scenes[i], dur: 0, audio: null, words: null });
   }
 
   let music = null;
@@ -336,10 +464,16 @@ export async function renderJob(job, cfg, workDir, outFile) {
     const voiceClips = [];
     for (let i = 0; i < items.length; i++) {
       const ap = path.join(workDir, "a" + i + ".wav");
-      let d = 0;
-      if (items[i].text && await fetchTTS(items[i].text, job.voice, ap, cfg)) d = await probeDuration(ap, cfg) || 0;
-      if (d <= 0) { await silenceClip(ap, cfg.sceneSeconds, cfg); d = await probeDuration(ap, cfg) || cfg.sceneSeconds; }
+      if (!items[i].text) throw new Error("scene narration is empty");
+      if (!(await fetchTTS(items[i].text, ap, cfg))) {
+        throw new Error("locked Ava narration failed for scene " + (i + 1));
+      }
+      const d = await probeDuration(ap, cfg) || 0;
+      if (d <= 0) throw new Error("Ava narration duration is invalid for scene " + (i + 1));
       items[i].dur = d;
+      items[i].audio = ap;
+      const wordsFile = ap + ".words.json";
+      items[i].words = wordsFile;
       voiceClips.push(ap);
     }
     const np = path.join(workDir, "voice.mp3");
@@ -349,7 +483,7 @@ export async function renderJob(job, cfg, workDir, outFile) {
   // Fallback: a single whole script narration, split evenly, if per scene is off or failed.
   if (cfg.ttsEnabled && !narration) {
     const np = path.join(workDir, "voice.mp3");
-    if (await fetchTTS(job.script, job.voice, np, cfg)) {
+    if (await fetchTTS(job.script, np, cfg)) {
       narration = np; total = await probeDuration(np, cfg);
       const each = Math.max(2, (total || items.length * cfg.sceneSeconds) / items.length);
       items.forEach((it) => { it.dur = each; });
@@ -359,12 +493,37 @@ export async function renderJob(job, cfg, workDir, outFile) {
   items.forEach((it) => { if (!it.dur || it.dur <= 0) it.dur = cfg.sceneSeconds; });
   total = total || items.reduce((s, it) => s + it.dur, 0);
 
-  cfg.log("  rendering " + items.length + " scenes with ffmpeg");
+  cfg.log("  rendering " + items.length + " scenes with ffmpeg" +
+    (storyMode ? " (presenter + highlighted captions)" : ""));
   const clips = [];
   for (let i = 0; i < items.length; i++) {
     const c = path.join(workDir, "clip" + i + ".mp4");
     try {
-      await kenBurnsClip(items[i].img, c, items[i].dur, cfg, i);
+      if (storyMode) {
+        let captions = null;
+        if (items[i].words && await fs.stat(items[i].words).catch(() => null)) {
+          captions = path.join(workDir, "captions" + i + ".ass");
+          try {
+            await buildSceneCaptions(items[i].words, captions, cfg);
+          } catch (error) {
+            captions = null;
+            cfg.log("  captions skipped scene " + (i + 1) + ": " +
+              String(error.message).slice(0, 90));
+          }
+        }
+        await storySceneClip(
+          presenter,
+          items[i].img,
+          items[i].audio,
+          captions,
+          c,
+          items[i].dur,
+          cfg,
+          i
+        );
+      } else {
+        await kenBurnsClip(items[i].img, c, items[i].dur, cfg, i);
+      }
       const st = await fs.stat(c);
       if (st.size > 1000) clips.push(c);
     } catch (e) {
@@ -374,22 +533,29 @@ export async function renderJob(job, cfg, workDir, outFile) {
   if (!clips.length) throw new Error("no clips were rendered");
   // Hard cuts, so every image stays pinned to its line. A crossfade would slide
   // the pictures steadily earlier, which is the drift we are removing.
-  const silent = path.join(workDir, "silent.mp4");
-  await fastConcat(clips, silent, cfg);
-
-  // A narrated documentary must have its audio. If muxAudio cannot attach the
-  // narration it throws, and this whole video is treated as failed (not uploaded)
-  // so it gets retried, rather than ever saving or publishing a silent video.
-  if (narration || music) await muxAudio(silent, narration, music, outFile, total, cfg);
-  else await fs.copyFile(silent, outFile);
+  if (storyMode) {
+    const joined = music ? path.join(workDir, "story-joined.mp4") : outFile;
+    await fastConcat(clips, joined, cfg);
+    if (music) await mixMusicUnder(joined, music, total, outFile, cfg);
+    if (cfg.ttsEnabled && !(await hasAudioStream(outFile, cfg))) {
+      throw new Error("the narration did not attach to the storytime video");
+    }
+  } else {
+    const silent = path.join(workDir, "silent.mp4");
+    await fastConcat(clips, silent, cfg);
+    // A narrated documentary must have its audio. If muxAudio cannot attach the
+    // narration it throws so a silent video is never published.
+    if (narration || music) await muxAudio(silent, narration, music, outFile, total, cfg);
+    else await fs.copyFile(silent, outFile);
+  }
 
   // Auto thumbnail: a bold, professional 1280x720 image that matches the video.
   if (cfg.thumbnails) {
-    try {
-      const thumbFile = outFile.replace(/\.(mp4|webm)$/i, "-thumbnail.jpg");
-      const t = await buildThumbnail(job, cfg, workDir, thumbFile, { fetchImage, run });
-      if (t) { job.thumbnailFile = thumbFile; cfg.log("  thumbnail: " + path.basename(thumbFile)); }
-    } catch (e) { cfg.log("  thumbnail skipped: " + e.message); }
+    const thumbFile = outFile.replace(/\.(mp4|webm)$/i, "-thumbnail.jpg");
+    const t = await buildThumbnail(job, cfg, workDir, thumbFile, { run });
+    if (!t) throw new Error("the required presenter thumbnail was not created");
+    job.thumbnailFile = thumbFile;
+    cfg.log("  thumbnail: " + path.basename(thumbFile) + " (opening hook + same presenter)");
   }
 
   return outFile;

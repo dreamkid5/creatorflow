@@ -10,7 +10,7 @@ A professional YouTube automation suite built with Astro. It gives a creator one
 | Analytics | Deep metrics, views trend, best publishing days, audience age, top countries, and a per video breakdown |
 | Videos | Full content library with live status filtering, a play preview for every video, and an edit dialog for title, description, tags, and visibility |
 | Automations | An autopilot engine: turn triggers into actions, build your own recipes, start from templates, and watch a live run log |
-| Bulk Studio | Drop in a CSV or a batch of scripts and it renders a finished illustrated video for each one, each with a free natural voiceover baked in, plus a live queue, progress, save all, a CSV template, per row voice and music columns, and a Watch folder mode that turns any new CSV into videos automatically and saves them back |
+| Bulk Studio | Drop in a CSV or a batch of scripts and it renders a finished illustrated video for each one, each with a free natural voiceover baked in, plus a live queue, progress, save all, a CSV template, music controls, and a Watch folder mode that turns any new CSV into videos automatically and saves them back |
 | Schedule | A working monthly upload calendar, smart timing suggestions, and automation toggles |
 | Auto Video | The guided pipeline: paste a script to auto fill the scenes or write one image prompt per scene, then choose the narration (generate a free natural voice, upload your own audio, or none), add an optional title card and background music, and press Make the whole video to generate the images, narrate, add transitions, and render the finished MP4 in one click. No scene limit |
 | Content Studio | Six generators that produce ideas, titles, descriptions, tags, thumbnail concepts, and script outlines |
@@ -56,20 +56,30 @@ The Thumbnail Studio calls a keyless image model. Requests pass through a same o
 Image generation and video rendering are fully keyless. For narration you have several options, most keyless and one optional premium.
 
 * **Free natural voice**: an open neural voice (Kokoro) that runs on your device in the browser. The small model downloads once, then works offline and needs no key. It plays and is baked into the exported video. Six voices, WebGPU when available.
-* **Local voice server, no card**: a free voice that runs on your own Mac through the `voice-server` folder, wrapping the open Piper engine. No key and no card. Run its `setup.sh` once, start it, set `LOCAL_TTS_URL`, and both the Auto Video Premium option and the worker use it. Clear and fast, a step above the browser voice.
+* **Local voice server, no card**: a free voice that runs on your own Mac through the `voice-server` folder, wrapping the open Piper engine. No key and no card. It remains available to the interactive Auto Video editor; the unattended production worker does not use it.
 * **Premium voice, your free key**: for documentary quality like a polished upload, the Auto Video page has a Premium option. It supports three providers and picks the one whose key you set, server side, so the key never reaches the browser. Set one of `ELEVENLABS_API_KEY`, `GOOGLE_TTS_KEY`, or `AZURE_SPEECH_KEY` (with `AZURE_SPEECH_REGION`) before `npm run dev`, and the voice list changes to that provider automatically. ElevenLabs gives the top quality, Google and Azure give large free tiers for volume.
 * **Upload your own audio** or **record a voiceover**: keyless, your own voice.
 * **Browser voice**: instant, for checking timing.
 
 ### Premium voice and high volume
 
-A free tier key means no payment, up to a monthly character limit. ElevenLabs sounds the best but its free tier is small, good for making individual videos. For high volume, such as several videos a day on a schedule, use a provider with a large free tier: **Google Cloud Text to Speech** gives about a million characters a month free with very good Neural2 voices, and **Microsoft Azure** gives about half a million. The background worker supports all three: set `GOOGLE_TTS_KEY` (best for volume) or `ELEVENLABS_API_KEY`, and it picks the provider automatically.
+These optional provider choices belong to the interactive Auto Video editor. The
+unattended production worker always uses Ava and does not read provider or voice
+selection settings.
 
 ## Watch folder mode
 
 The Bulk Studio can watch a real local folder. Choose a folder once, and every new CSV that lands in it is turned into videos and written to an `output` subfolder inside it, on the interval you pick. This uses the browser File System Access API, so it runs in desktop Chrome or Edge while the tab stays open.
 
 For unattended rendering with the tab closed or on a server, use the background worker in the [`worker`](worker/README.md) folder. It watches a folder and renders every CSV row into an MP4 with ffmpeg, no browser needed, and runs continuously or once from cron. See [worker/README.md](worker/README.md) for setup.
+
+The unattended worker is locked to the supplied storytime reference: a unique
+white adult woman in the 38% left panel, exact narration-matched photorealistic
+scenes on the right, the selected Ava female neural narration, and four-word
+Montserrat ExtraBold captions with a purple active-word box. Presenter seeds and
+image hashes persist across runs so exact duplicates are rejected. Every video
+also gets a white-panel, multicolour hook thumbnail containing that same presenter.
+CSV and environment voice or caption overrides are ignored.
 
 ## Data
 

@@ -8,40 +8,39 @@
 // Requires Node 18 or newer and ffmpeg (with ffprobe) on the PATH.
 
 import fs from "node:fs/promises";
+import { existsSync } from "node:fs";
 import path from "node:path";
+import { fileURLToPath } from "node:url";
 import { jobsFromCSV, slug } from "./csv.mjs";
 import { renderJob } from "./render.mjs";
 import { uploadToYouTube } from "./upload.mjs";
 import { generateSEO } from "./seo.mjs";
+import { LOCKED_VOICE, LOCKED_VOICE_LABEL } from "./voice.mjs";
 
 // Load worker/.env if present, so keys live in one file.
 try { process.loadEnvFile(); } catch (e) { /* no .env, that is fine */ }
 
+const HERE = path.dirname(fileURLToPath(import.meta.url));
+const bundledFfmpeg = path.join(HERE, "tools", "ffmpeg");
+const bundledFfprobe = path.join(HERE, "tools", "ffprobe");
+
 const cfg = {
   input: process.env.CF_INPUT || "./input",
   output: process.env.CF_OUTPUT || "./output",
-  style: process.env.CF_STYLE || "watercolor",
-  sceneSeconds: Number(process.env.CF_SCENE_SECONDS || 4),
+  style: process.env.CF_STYLE || "story",
+  sceneSeconds: Number(process.env.CF_SCENE_SECONDS || 4.2),
+  width: Number(process.env.CF_WIDTH || 1920),
+  height: Number(process.env.CF_HEIGHT || 1080),
+  crf: Number(process.env.CF_CRF || 20),
+  zoom: Number(process.env.CF_ZOOM || 0.06),
+  presenterZoom: Number(process.env.CF_PRESENTER_ZOOM || 0),
   imageBase: process.env.CF_IMAGE_BASE || "https://image.pollinations.ai/prompt",
   imageModel: process.env.CF_IMAGE_MODEL || "flux",
   imageToken: process.env.CF_IMAGE_TOKEN || "",
-  ttsKey: process.env.TTS_API_KEY || "",
-  ttsUrl: process.env.CF_TTS_URL || "https://api.openai.com/v1/audio/speech",
-  ttsModel: process.env.CF_TTS_MODEL || "gpt-4o-mini-tts",
-  ttsVoice: process.env.CF_TTS_VOICE || "nova",
-  // local voice server, free and no card
-  localTtsUrl: process.env.LOCAL_TTS_URL || "",
-  // premium voice providers, choose by which key is set
-  azureKey: process.env.AZURE_SPEECH_KEY || "",
-  azureRegion: process.env.AZURE_SPEECH_REGION || "eastus",
-  azureVoice: process.env.CF_AZURE_VOICE || "en-US-GuyNeural",
-  googleKey: process.env.GOOGLE_TTS_KEY || "",
-  googleVoice: process.env.CF_GOOGLE_VOICE || "en-US-Neural2-J",
-  elevenKey: process.env.ELEVENLABS_API_KEY || "",
-  elevenVoice: process.env.CF_ELEVEN_VOICE || "VR6AewLTigWG4xSOukaG",
+  edgeCmd: process.env.CF_EDGE_CMD || "python3",
   music: process.env.CF_MUSIC || "",
-  ffmpeg: process.env.CF_FFMPEG || "ffmpeg",
-  ffprobe: process.env.CF_FFPROBE || "ffprobe",
+  ffmpeg: process.env.CF_FFMPEG || (existsSync(bundledFfmpeg) ? bundledFfmpeg : "ffmpeg"),
+  ffprobe: process.env.CF_FFPROBE || (existsSync(bundledFfprobe) ? bundledFfprobe : "ffprobe"),
   interval: Number(process.env.CF_INTERVAL || 30),
   // YouTube upload
   ytClientId: process.env.YT_CLIENT_ID || "",
@@ -57,17 +56,19 @@ const cfg = {
   log: (m) => console.log(m)
 };
 cfg.ytUpload = process.env.CF_YT_UPLOAD === "0" ? false : !!(cfg.ytClientId && cfg.ytClientSecret && cfg.ytRefreshToken);
-cfg.ttsProvider = process.env.CF_TTS_PROVIDER || (cfg.localTtsUrl ? "local" : cfg.azureKey ? "azure" : cfg.googleKey ? "google" : cfg.elevenKey ? "elevenlabs" : "openai");
-cfg.ttsEnabled = !!(cfg.localTtsUrl || cfg.azureKey || cfg.googleKey || cfg.elevenKey || cfg.ttsKey);
+cfg.ttsEnabled = true;
+cfg.presenterHistory = process.env.CF_PRESENTER_HISTORY ||
+  path.join(cfg.output, ".presenter-history.json");
 // SEO is off when CF_SEO=0 (user writes description and tags by hand). Scene
 // matching and character consistency are separate and stay on.
 cfg.seoEnabled = process.env.CF_SEO === "0" ? false : !!cfg.anthropicKey;
 // character consistency: on by default when a Claude key is set, disable with CF_CHARACTERS=0
 cfg.characters = process.env.CF_CHARACTERS === "0" ? false : true;
-// scene matching: Claude turns narration into visual prompts so images fit. CF_SCENE_VISUALS=0 to disable
-cfg.sceneVisuals = process.env.CF_SCENE_VISUALS === "0" ? false : true;
-// auto thumbnail: on by default, disable with CF_THUMBNAILS=0
-cfg.thumbnails = process.env.CF_THUMBNAILS === "0" ? false : true;
+// Scene matching is mandatory. Claude refines the exact narrated segment when a
+// key is available; otherwise that same segment is used directly as its prompt.
+cfg.sceneVisuals = true;
+// Every finished production video must have the locked hook-and-presenter thumbnail.
+cfg.thumbnails = true;
 cfg.font = process.env.CF_FONT || "";
 
 const stamp = () => new Date().toISOString().replace("T", " ").slice(0, 19);
@@ -107,7 +108,7 @@ function jobFromText(name, text) {
   const script = text.replace(/\r/g, "").trim();
   if (!script) return [];
   const title = name.replace(/\.txt$/i, "").replace(/[_-]+/g, " ").trim();
-  return [{ title: title || "Video", script, style: cfg.style, voice: "", music: cfg.music }];
+  return [{ title: title || "Video", script, style: cfg.style, music: cfg.music }];
 }
 
 async function processCSV(file, processed) {
@@ -193,7 +194,7 @@ async function main() {
   log("CreatorFlow worker starting");
   log("input:  " + path.resolve(cfg.input));
   log("output: " + path.resolve(cfg.output));
-  log("narration: " + (cfg.ttsEnabled ? "on, provider " + cfg.ttsProvider : "off (set AZURE_SPEECH_KEY, GOOGLE_TTS_KEY, ELEVENLABS_API_KEY, or TTS_API_KEY)"));
+  log("narration: locked to " + LOCKED_VOICE_LABEL + " (" + LOCKED_VOICE + ")");
   log("seo: " + (cfg.seoEnabled ? "on, Claude writes titles, descriptions, and tags" : "off (set ANTHROPIC_API_KEY to enable)"));
   log("characters: " + (cfg.anthropicKey && cfg.characters ? "on, Claude keeps main characters consistent" : "off"));
   log("scene matching: " + (cfg.anthropicKey && cfg.sceneVisuals ? "on, Claude matches each image to the narration" : "off"));
