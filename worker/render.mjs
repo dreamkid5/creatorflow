@@ -78,13 +78,66 @@ async function fetchImage(prompt, seed, outPath, cfg, opts = {}) {
   return false;
 }
 
-async function fetchTTS(script, outPath, cfg) {
-  try {
-    const textFile = outPath + ".txt";
-    const wordsFile = outPath + ".words.json";
-    await fs.writeFile(textFile, script);
+function narrationParts(text) {
+  const words = String(text || "").trim().split(/\s+/).filter(Boolean);
+  if (words.length < 8) return null;
+  const middle = Math.ceil(words.length / 2);
+  return [words.slice(0, middle).join(" "), words.slice(middle).join(" ")];
+}
+
+async function readWordTimings(file) {
+  const value = JSON.parse(await fs.readFile(file, "utf8"));
+  if (!Array.isArray(value) || !value.length) {
+    throw new Error("word timings were empty");
+  }
+  return value;
+}
+
+async function mergeWordTimings(partFiles, durations, outFile) {
+  const merged = [];
+  let offset = 0;
+  for (let i = 0; i < partFiles.length; i++) {
+    const words = await readWordTimings(partFiles[i]);
+    for (const word of words) {
+      merged.push({ ...word, t: Number(word.t || 0) + offset });
+    }
+    offset += Number(durations[i] || 0);
+  }
+  await fs.writeFile(outFile, JSON.stringify(merged));
+}
+
+// Edge TTS is a remote streaming service. A long video can require hundreds of
+// independent calls, so one transient websocket or throttling failure must not
+// discard hours of work. Every clip is retried in a fresh Python process with
+// exponential backoff and validated for both audio and word timings. If a line
+// repeatedly fails, it is split into two smaller requests and reassembled.
+export async function fetchTTS(script, outPath, cfg, options = {}) {
+  const text = String(script || "").trim();
+  if (!text) throw new Error("narration text is empty");
+
+  const label = options.label || "narration";
+  const runCommand = options.runCommand || run;
+  const sleepFn = options.sleepFn || sleep;
+  const probeDurationFn = options.probeDurationFn || ((file) => probeDuration(file, cfg));
+  const concatAudioFn = options.concatAudioFn || ((files, file) => concatAudio(files, file, cfg));
+  const maxAttempts = Math.max(
+    1,
+    Number(options.maxAttempts || process.env.CF_TTS_ATTEMPTS || 8)
+  );
+  const retryBaseMs = Math.max(
+    0,
+    Number(options.retryBaseMs ?? process.env.CF_TTS_RETRY_BASE_MS ?? 2500)
+  );
+  const textFile = outPath + ".txt";
+  const wordsFile = outPath + ".words.json";
+  let lastError = new Error("unknown Edge TTS error");
+
+  for (let attempt = 1; attempt <= maxAttempts; attempt++) {
+    await fs.rm(outPath, { force: true }).catch(() => {});
+    await fs.rm(wordsFile, { force: true }).catch(() => {});
+    await fs.writeFile(textFile, text);
     try {
-      await run(cfg.edgeCmd || "python3", [
+      await runCommand(cfg.edgeCmd || "python3", [
         path.join(HERE, "tts_words.py"),
         textFile,
         LOCKED_VOICE,
@@ -93,14 +146,65 @@ async function fetchTTS(script, outPath, cfg) {
         LOCKED_VOICE_RATE,
         LOCKED_VOICE_PITCH
       ]);
+      const stat = await fs.stat(outPath).catch(() => null);
+      if (!stat || stat.size <= 1000) throw new Error("audio output was empty");
+      await readWordTimings(wordsFile);
+      const duration = await probeDurationFn(outPath);
+      if (!duration || duration <= 0) throw new Error("audio duration was invalid");
+      return true;
+    } catch (error) {
+      lastError = error instanceof Error ? error : new Error(String(error));
+      if (attempt < maxAttempts) {
+        const waitMs = Math.min(30000, retryBaseMs * (2 ** (attempt - 1)));
+        cfg.log(
+          "  Ava " + label + " attempt " + attempt + "/" + maxAttempts +
+          " failed (" + lastError.message.slice(0, 140) + "); retrying in " +
+          Math.round(waitMs / 1000) + "s"
+        );
+        await sleepFn(waitMs);
+      }
     } finally {
       await fs.rm(textFile, { force: true }).catch(() => {});
     }
-    const stat = await fs.stat(outPath).catch(() => null);
-    return !!(stat && stat.size > 1000);
-  } catch (e) {
-    return false;
   }
+
+  if (options.allowSplit !== false) {
+    const parts = narrationParts(text);
+    if (parts) {
+      cfg.log("  Ava " + label + " is using the two-part recovery path");
+      const partAudio = parts.map(
+        (_part, index) => outPath + ".recovery-" + (index + 1) + ".mp3"
+      );
+      const partWords = partAudio.map((file) => file + ".words.json");
+      const partDurations = [];
+      try {
+        for (let i = 0; i < parts.length; i++) {
+          const partPath = partAudio[i];
+          await fetchTTS(parts[i], partPath, cfg, {
+            ...options,
+            allowSplit: false,
+            label: label + " recovery part " + (i + 1),
+            maxAttempts: Math.max(4, Math.ceil(maxAttempts / 2))
+          });
+          partDurations.push(await probeDurationFn(partPath));
+        }
+        await concatAudioFn(partAudio, outPath);
+        await mergeWordTimings(partWords, partDurations, wordsFile);
+        const duration = await probeDurationFn(outPath);
+        if (!duration || duration <= 0) throw new Error("recovered audio duration was invalid");
+        return true;
+      } finally {
+        for (const file of [...partAudio, ...partWords]) {
+          await fs.rm(file, { force: true }).catch(() => {});
+        }
+      }
+    }
+  }
+
+  throw new Error(
+    "Ava could not generate " + label + " after " + maxAttempts +
+    " fresh attempts: " + lastError.message
+  );
 }
 
 async function fetchMusic(url, outPath) {
@@ -462,11 +566,19 @@ export async function renderJob(job, cfg, workDir, outFile) {
   if (cfg.ttsEnabled) {
     cfg.log("  narrating " + items.length + " lines, one voice clip each");
     const voiceClips = [];
+    const pacingMs = Math.max(0, Number(process.env.CF_TTS_PACING_MS ?? 200));
     for (let i = 0; i < items.length; i++) {
       const ap = path.join(workDir, "a" + i + ".wav");
       if (!items[i].text) throw new Error("scene narration is empty");
-      if (!(await fetchTTS(items[i].text, ap, cfg))) {
-        throw new Error("locked Ava narration failed for scene " + (i + 1));
+      try {
+        await fetchTTS(items[i].text, ap, cfg, {
+          label: "scene " + (i + 1) + "/" + items.length
+        });
+      } catch (error) {
+        throw new Error(
+          "locked Ava narration failed for scene " + (i + 1) +
+          " after all recovery attempts: " + error.message
+        );
       }
       const d = await probeDuration(ap, cfg) || 0;
       if (d <= 0) throw new Error("Ava narration duration is invalid for scene " + (i + 1));
@@ -475,6 +587,12 @@ export async function renderJob(job, cfg, workDir, outFile) {
       const wordsFile = ap + ".words.json";
       items[i].words = wordsFile;
       voiceClips.push(ap);
+      if ((i + 1) % 25 === 0 || i + 1 === items.length) {
+        cfg.log("  narration " + (i + 1) + "/" + items.length);
+      }
+      // A tiny gap between requests prevents hundreds of back-to-back websocket
+      // sessions from looking like a burst and being throttled by Edge TTS.
+      if (pacingMs && i + 1 < items.length) await sleep(pacingMs);
     }
     const np = path.join(workDir, "voice.mp3");
     try { await concatAudio(voiceClips, np, cfg); narration = np; total = await probeDuration(np, cfg); }
@@ -483,10 +601,13 @@ export async function renderJob(job, cfg, workDir, outFile) {
   // Fallback: a single whole script narration, split evenly, if per scene is off or failed.
   if (cfg.ttsEnabled && !narration) {
     const np = path.join(workDir, "voice.mp3");
-    if (await fetchTTS(job.script, np, cfg)) {
+    try {
+      await fetchTTS(job.script, np, cfg, { label: "whole-script fallback" });
       narration = np; total = await probeDuration(np, cfg);
       const each = Math.max(2, (total || items.length * cfg.sceneSeconds) / items.length);
       items.forEach((it) => { it.dur = each; });
+    } catch (error) {
+      throw new Error("Ava whole-script fallback failed: " + error.message);
     }
   }
   // No narration at all: fixed length per scene.

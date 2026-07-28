@@ -114,7 +114,12 @@ function jobFromText(name, text) {
 async function processCSV(file, processed) {
   const text = await fs.readFile(path.join(cfg.input, file.name), "utf8");
   const jobs = /\.txt$/i.test(file.name) ? jobFromText(file.name, text) : jobsFromCSV(text);
-  if (!jobs.length) { log("no rows in " + file.name + ", skipping"); processed.add(file.key); await saveProcessed(processed); return; }
+  if (!jobs.length) {
+    log("no rows in " + file.name + ", skipping");
+    processed.add(file.key);
+    await saveProcessed(processed);
+    return true;
+  }
   log("processing " + file.name + " with " + jobs.length + " video(s)");
 
   let fileOk = true;
@@ -172,13 +177,23 @@ async function processCSV(file, processed) {
       await fs.mkdir(pub, { recursive: true });
       await fs.rename(path.join(cfg.input, file.name), path.join(pub, file.name));
       log("  archived " + file.name);
-    } catch (e) { log("  archive move failed: " + e.message); }
-  } else {
+    } catch (e) {
+      fileOk = false;
+      log("  archive move failed: " + e.message);
+    }
+  }
+  if (!fileOk) {
     log("  kept " + file.name + " to retry next run (a step failed)");
   }
-  processed.add(file.key);
-  await saveProcessed(processed);
+  // A failed input must remain eligible. This matters for a persistent watcher:
+  // previously it marked failures as processed and never retried them until the
+  // file changed, even though the log claimed it would retry.
+  if (fileOk) {
+    processed.add(file.key);
+    await saveProcessed(processed);
+  }
   log("finished " + file.name);
+  return fileOk;
 }
 
 async function runOnce() {
@@ -186,7 +201,19 @@ async function runOnce() {
   const processed = await loadProcessed();
   const news = await listNewCSVs(processed);
   if (!news.length) { log("no new CSV files in " + cfg.input); return; }
-  for (const f of news) await processCSV(f, processed);
+  const failed = [];
+  for (const f of news) {
+    if (!(await processCSV(f, processed))) failed.push(f.name);
+  }
+  // Let GitHub Actions show a real red failure when rendering or uploading did
+  // not complete. The archive and artifact steps use `if: always()` and still
+  // run, while the input script stays in place for a clean retry.
+  if (failed.length) {
+    throw new Error(
+      failed.length + " input file(s) failed and remain queued for retry: " +
+      failed.join(", ")
+    );
+  }
 }
 
 async function main() {
