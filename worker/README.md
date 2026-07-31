@@ -84,8 +84,9 @@ The supplied reference video is the production template:
 
 Each right-side image is generated from the exact narration segment attached to
 that scene. Segments target about 12 words, matching the short sentence-level
-changes in the reference. Each receives its own Ava clip and measured duration,
-so the image changes with the spoken segment rather than drifting on a generic timer.
+changes in the reference. Every scene is permanently locked to exactly 5.5
+seconds. Its Ava audio and word timings are fitted to the same 5.5-second window,
+so narration and highlighted captions remain synchronized without clipping.
 When Claude scene direction is available it refines that same segment; otherwise
 the segment itself is used as the image prompt.
 
@@ -108,7 +109,7 @@ the opening hook directly from the script and limits it to a readable 20 words.
 | `CF_INPUT` | `./input` | Folder to watch for CSV files |
 | `CF_OUTPUT` | `./output` | Folder for finished videos |
 | `CF_STYLE` | `story` | Default split-screen storytime format |
-| `CF_SCENE_SECONDS` | `4.2` | Seconds per scene when there is no narration |
+| Scene duration | `5.5` seconds | Permanently locked; environment overrides are ignored |
 | `CF_WIDTH` / `CF_HEIGHT` | `1920` / `1080` | Output resolution |
 | Presenter panel | `38%` | Locked to the supplied reference |
 | Captions | Montserrat ExtraBold, four words, `6%` height | Locked to the supplied reference |

@@ -12,7 +12,7 @@ import { existsSync } from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { jobsFromCSV, slug } from "./csv.mjs";
-import { renderJob } from "./render.mjs";
+import { LOCKED_SCENE_SECONDS, renderJob } from "./render.mjs";
 import { uploadToYouTube } from "./upload.mjs";
 import { generateSEO } from "./seo.mjs";
 import { LOCKED_VOICE, LOCKED_VOICE_LABEL } from "./voice.mjs";
@@ -28,7 +28,8 @@ const cfg = {
   input: process.env.CF_INPUT || "./input",
   output: process.env.CF_OUTPUT || "./output",
   style: process.env.CF_STYLE || "story",
-  sceneSeconds: Number(process.env.CF_SCENE_SECONDS || 4.2),
+  // Fixed production contract; environment overrides are intentionally ignored.
+  sceneSeconds: LOCKED_SCENE_SECONDS,
   width: Number(process.env.CF_WIDTH || 1920),
   height: Number(process.env.CF_HEIGHT || 1080),
   crf: Number(process.env.CF_CRF || 20),

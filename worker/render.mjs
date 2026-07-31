@@ -27,6 +27,11 @@ const HERE = path.dirname(fileURLToPath(import.meta.url));
 const FONTS_DIR = path.join(HERE, "assets", "fonts");
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
+// Production timing is locked: every future scene must occupy exactly 5.5
+// seconds. Keep this independent of environment overrides so a workflow secret
+// or an old local .env cannot silently change the channel's scene cadence.
+export const LOCKED_SCENE_SECONDS = 5.5;
+
 function ffEscapePath(value) {
   return value.replace(/\\/g, "\\\\").replace(/:/g, "\\:").replace(/'/g, "\\'");
 }
@@ -49,6 +54,75 @@ function probeDuration(file, cfg) {
     p.on("error", () => res(null));
     p.on("close", () => { const n = parseFloat(out.trim()); res(isFinite(n) && n > 0 ? n : null); });
   });
+}
+
+export function atempoFiltersForDuration(sourceDuration, targetDuration) {
+  const source = Number(sourceDuration);
+  const target = Number(targetDuration);
+  if (!Number.isFinite(source) || source <= 0 || !Number.isFinite(target) || target <= 0) {
+    throw new Error("audio timing requires positive source and target durations");
+  }
+  let ratio = source / target;
+  const filters = [];
+  // Chaining within 0.5..2 keeps this compatible with older ffmpeg builds.
+  while (ratio < 0.5) {
+    filters.push("atempo=0.5");
+    ratio /= 0.5;
+  }
+  while (ratio > 2) {
+    filters.push("atempo=2");
+    ratio /= 2;
+  }
+  filters.push("atempo=" + ratio.toFixed(8));
+  return filters;
+}
+
+export function scaleWordTimings(words, sourceDuration, targetDuration) {
+  const scale = Number(targetDuration) / Number(sourceDuration);
+  if (!Array.isArray(words) || !words.length || !Number.isFinite(scale) || scale <= 0) {
+    throw new Error("word timing scale is invalid");
+  }
+  return words.map((word) => {
+    const t = Number(Math.min(
+      Number(targetDuration),
+      Math.max(0, Number(word.t || 0) * scale)
+    ).toFixed(6));
+    const d = Number(Math.min(
+      Math.max(0, Number(targetDuration) - t),
+      Math.max(0, Number(word.d || 0) * scale)
+    ).toFixed(6));
+    return { ...word, t, d };
+  });
+}
+
+export async function lockNarrationDuration(audioPath, wordsPath, sourceDuration, cfg) {
+  const target = LOCKED_SCENE_SECONDS;
+  const timedPath = audioPath + ".locked.wav";
+  const words = await readWordTimings(wordsPath);
+  const filters = [
+    ...atempoFiltersForDuration(sourceDuration, target),
+    "apad=pad_dur=" + target,
+    "atrim=duration=" + target
+  ].join(",");
+  try {
+    await run(cfg.ffmpeg, [
+      "-y", "-i", audioPath,
+      "-filter:a", filters,
+      "-ar", "24000", "-ac", "1", "-c:a", "pcm_s16le",
+      timedPath
+    ]);
+    const duration = await probeDuration(timedPath, cfg);
+    if (!duration || Math.abs(duration - target) > 0.06) {
+      throw new Error("locked scene audio was " + duration + " seconds instead of " + target);
+    }
+    await fs.rename(timedPath, audioPath);
+    await fs.writeFile(
+      wordsPath,
+      JSON.stringify(scaleWordTimings(words, sourceDuration, target))
+    );
+  } finally {
+    await fs.rm(timedPath, { force: true }).catch(() => {});
+  }
 }
 
 // ---------- asset fetching ----------
@@ -468,6 +542,7 @@ async function muxAudio(video, narration, music, outPath, total, cfg) {
 export async function renderJob(job, cfg, workDir, outFile) {
   await fs.mkdir(workDir, { recursive: true });
   const scenes = splitScript(job.script);
+  cfg.log("  scene duration: locked to " + LOCKED_SCENE_SECONDS + " seconds each");
   const style = "story";
   const storyMode = true;
 
@@ -558,10 +633,9 @@ export async function renderJob(job, cfg, workDir, outFile) {
   if (job.music) music = await fetchMusic(job.music, path.join(workDir, "music.bin"));
   else if (cfg.music) music = cfg.music;
 
-  // Narration timed per scene. One short voice clip per line, measured, so each
-  // image is shown for exactly as long as its line is spoken. The clips are then
-  // joined into one continuous narration track. This is what keeps the scenes in
-  // sync with the voice instead of drifting.
+  // Narration is generated per scene, then time-fitted to the locked 5.5-second
+  // production cadence. Word timings are scaled with the audio so highlighted
+  // captions remain synchronized and no narration is clipped.
   let narration = null, total = null;
   if (cfg.ttsEnabled) {
     cfg.log("  narrating " + items.length + " lines, one voice clip each");
@@ -582,9 +656,10 @@ export async function renderJob(job, cfg, workDir, outFile) {
       }
       const d = await probeDuration(ap, cfg) || 0;
       if (d <= 0) throw new Error("Ava narration duration is invalid for scene " + (i + 1));
-      items[i].dur = d;
-      items[i].audio = ap;
       const wordsFile = ap + ".words.json";
+      await lockNarrationDuration(ap, wordsFile, d, cfg);
+      items[i].dur = LOCKED_SCENE_SECONDS;
+      items[i].audio = ap;
       items[i].words = wordsFile;
       voiceClips.push(ap);
       if ((i + 1) % 25 === 0 || i + 1 === items.length) {
@@ -598,20 +673,39 @@ export async function renderJob(job, cfg, workDir, outFile) {
     try { await concatAudio(voiceClips, np, cfg); narration = np; total = await probeDuration(np, cfg); }
     catch (e) { cfg.log("  per scene voice join failed (" + e.message + "), using one narration"); }
   }
-  // Fallback: a single whole script narration, split evenly, if per scene is off or failed.
+  // Fallback: a single whole-script narration, time-fitted to the exact combined
+  // duration of all 5.5-second scenes.
   if (cfg.ttsEnabled && !narration) {
     const np = path.join(workDir, "voice.mp3");
     try {
       await fetchTTS(job.script, np, cfg, { label: "whole-script fallback" });
-      narration = np; total = await probeDuration(np, cfg);
-      const each = Math.max(2, (total || items.length * cfg.sceneSeconds) / items.length);
-      items.forEach((it) => { it.dur = each; });
+      const sourceDuration = await probeDuration(np, cfg);
+      if (!sourceDuration) throw new Error("whole-script narration duration is invalid");
+      const targetTotal = items.length * LOCKED_SCENE_SECONDS;
+      const timedPath = np + ".locked.mp3";
+      const filters = [
+        ...atempoFiltersForDuration(sourceDuration, targetTotal),
+        "apad=pad_dur=" + targetTotal,
+        "atrim=duration=" + targetTotal
+      ].join(",");
+      try {
+        await run(cfg.ffmpeg, [
+          "-y", "-i", np, "-filter:a", filters,
+          "-ar", "44100", "-ac", "1", "-c:a", "libmp3lame", timedPath
+        ]);
+        await fs.rename(timedPath, np);
+      } finally {
+        await fs.rm(timedPath, { force: true }).catch(() => {});
+      }
+      narration = np;
+      total = targetTotal;
+      items.forEach((it) => { it.dur = LOCKED_SCENE_SECONDS; });
     } catch (error) {
       throw new Error("Ava whole-script fallback failed: " + error.message);
     }
   }
   // No narration at all: fixed length per scene.
-  items.forEach((it) => { if (!it.dur || it.dur <= 0) it.dur = cfg.sceneSeconds; });
+  items.forEach((it) => { if (!it.dur || it.dur <= 0) it.dur = LOCKED_SCENE_SECONDS; });
   total = total || items.reduce((s, it) => s + it.dur, 0);
 
   cfg.log("  rendering " + items.length + " scenes with ffmpeg" +
