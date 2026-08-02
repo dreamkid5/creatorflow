@@ -1,0 +1,34 @@
+name: Replace Mother in Law thumbnail
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "thumbnail-replacements/cqoMEkbigbo.jpg"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: replace-thumbnail-cqoMEkbigbo
+  cancel-in-progress: true
+
+jobs:
+  replace:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+
+      - name: Replace the custom thumbnail
+        env:
+          YT_CLIENT_ID: ${{ secrets.YT_CLIENT_ID }}
+          YT_CLIENT_SECRET: ${{ secrets.YT_CLIENT_SECRET }}
+          YT_REFRESH_TOKEN: ${{ secrets.YT_REFRESH_TOKEN }}
+        run: >-
+          node worker/replace-thumbnail.mjs
+          cqoMEkbigbo
+          thumbnail-replacements/cqoMEkbigbo.jpg
