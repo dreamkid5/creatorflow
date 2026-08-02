@@ -95,12 +95,16 @@ the segment itself is used as the image prompt.
 Every video receives a 1280x720 thumbnail in the locked reference layout:
 
 * clean white copy panel on the left
-* large outlined hook text in purple, teal, orange, and pink
+* large outlined two-beat kicker text in purple, teal, orange, and pink
 * the exact same female presenter from the video on the right
-* no title, SEO headline, or AI-generated headline text
+* exactly two complementary headline beats, never a copied opening sentence
 
-Provide an explicit `hook` CSV value when available. Otherwise the worker uses
-the opening hook directly from the script and limits it to a readable 20 words.
+Provide an explicit `hook` CSV value when available; write its two beats on
+separate lines or divide them with ` | `. Otherwise Claude extracts the story's
+strongest truthful betrayal, secret, danger, or reversal. The locked validator
+requires exactly two lines of 2-6 words each and 5-11 words total. Invalid or
+unavailable automatic copy stops the upload instead of publishing a weak
+one-sentence thumbnail.
 
 ## Settings (all optional)
 

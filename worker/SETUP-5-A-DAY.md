@@ -18,8 +18,9 @@ cp .env.example .env
 ```
 
 Each time you want videos, put them in `input/pending.csv`. One row per video:
-`title, script, hook, style, music`. The hook is optional; when it is blank, the
-thumbnail uses the opening words of the script. Start from the template:
+`title, script, hook, style, music`. The hook is optional; when it is blank,
+Claude creates a locked two-line story kicker from the strongest truthful twist.
+For manual copy, separate the two beats with ` | `. Start from the template:
 
 ```
 cp sample-videos.csv input/pending.csv

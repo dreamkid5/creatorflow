@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Build the locked storytime thumbnail layout from the video's presenter."""
+"""Build the locked two-beat storytime thumbnail from the video's presenter."""
 
 import sys
 from pathlib import Path
@@ -12,6 +12,7 @@ PRESENTER_X = 750
 TEXT_X = 44
 TEXT_RIGHT = 725
 PALETTE = ("#7C3AED", "#0891B2", "#EA580C", "#DB2777")
+BEAT_GAP = 26
 
 
 def word_width(draw, word, font):
@@ -39,23 +40,29 @@ def wrap_words(draw, words, font):
     return lines
 
 
-def choose_layout(draw, words, font_path):
-    for size in range(82, 41, -2):
+def wrap_beats(draw, beats, font):
+    return [wrap_words(draw, beat, font) for beat in beats]
+
+
+def choose_layout(draw, beats, font_path):
+    for size in range(96, 53, -2):
         font = ImageFont.truetype(font_path, size)
         try:
             font.set_variation_by_axes([800])
         except (AttributeError, OSError):
             pass
-        lines = wrap_words(draw, words, font)
+        wrapped = wrap_beats(draw, beats, font)
+        lines = [line for beat in wrapped for line in beat]
         line_height = round(size * 1.14)
-        if len(lines) <= 7 and len(lines) * line_height <= 590:
-            return font, lines, line_height, size
-    font = ImageFont.truetype(font_path, 40)
+        total_height = len(lines) * line_height + BEAT_GAP
+        if all(len(beat) <= 2 for beat in wrapped) and len(lines) <= 4 and total_height <= 590:
+            return font, wrapped, line_height, size
+    font = ImageFont.truetype(font_path, 52)
     try:
         font.set_variation_by_axes([800])
     except (AttributeError, OSError):
         pass
-    return font, wrap_words(draw, words, font), 46, 40
+    return font, wrap_beats(draw, beats, font), 59, 52
 
 
 def add_presenter(canvas, presenter_path):
@@ -82,40 +89,48 @@ def add_presenter(canvas, presenter_path):
 
 def main():
     presenter_path, output_path, hook_text, font_path = sys.argv[1:5]
-    words_raw = hook_text.replace("\n", " ").split()
-    if not words_raw:
-        raise SystemExit("thumbnail hook is empty")
+    beat_texts = [line.strip() for line in hook_text.splitlines() if line.strip()]
+    if len(beat_texts) != 2:
+        raise SystemExit("thumbnail hook must contain exactly two headline lines")
     if not Path(presenter_path).exists():
         raise SystemExit("presenter image is missing")
 
-    count = len(words_raw)
-    words = []
-    for index, text in enumerate(words_raw):
-        band = min(len(PALETTE) - 1, index * len(PALETTE) // count)
-        words.append({"text": text, "color": PALETTE[band]})
+    beats = []
+    for beat_index, beat_text in enumerate(beat_texts):
+        words_raw = beat_text.split()
+        colors = PALETTE[beat_index * 2 : beat_index * 2 + 2]
+        words = []
+        for index, text in enumerate(words_raw):
+            band = min(len(colors) - 1, index * len(colors) // len(words_raw))
+            words.append({"text": text, "color": colors[band]})
+        beats.append(words)
 
     canvas = Image.new("RGB", (WIDTH, HEIGHT), "white")
     add_presenter(canvas, presenter_path)
     draw = ImageDraw.Draw(canvas)
-    font, lines, line_height, font_size = choose_layout(draw, words, font_path)
-    total_height = len(lines) * line_height
+    font, wrapped_beats, line_height, font_size = choose_layout(draw, beats, font_path)
+    total_lines = sum(len(beat) for beat in wrapped_beats)
+    total_height = total_lines * line_height + BEAT_GAP
     y = max(52, round((HEIGHT - total_height) / 2))
     stroke = max(3, round(font_size * 0.055))
     space = word_width(draw, " ", font)
 
-    for line in lines:
-        x = TEXT_X
-        for item in line:
-            draw.text(
-                (x, y),
-                item["text"],
-                font=font,
-                fill=item["color"],
-                stroke_width=stroke,
-                stroke_fill="#101014",
-            )
-            x += word_width(draw, item["text"], font) + space
-        y += line_height
+    for beat_index, lines in enumerate(wrapped_beats):
+        for line in lines:
+            x = TEXT_X
+            for item in line:
+                draw.text(
+                    (x, y),
+                    item["text"],
+                    font=font,
+                    fill=item["color"],
+                    stroke_width=stroke,
+                    stroke_fill="#101014",
+                )
+                x += word_width(draw, item["text"], font) + space
+            y += line_height
+        if beat_index == 0:
+            y += BEAT_GAP
 
     canvas.save(output_path, "JPEG", quality=94, subsampling=0)
 
