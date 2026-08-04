@@ -4,8 +4,10 @@ This makes five storytime videos a day on your Mac, files them into dated
 folders, and can optionally upload them to YouTube.
 
 Every video uses the locked `en-US-AvaMultilingualNeural` female narration.
-Every presenter is a white adult woman fixed on the left side. There is no voice
-setting to configure and old CSV voice values are ignored.
+Every presenter is a white adult woman fixed on the left side. Her visible age
+must match the narrator's present-day age in the script; mismatched portraits are
+rejected. There is no voice setting to configure and old CSV voice values are
+ignored.
 
 ## Part 1: prepare the worker (once)
 

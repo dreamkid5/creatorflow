@@ -21,6 +21,7 @@ No browser and no headless Chrome. All rendering is done by ffmpeg.
 * Node 18 or newer (uses the built in fetch, no npm install needed)
 * Python 3 with `edge-tts` and `Pillow`: `python3 -m pip install edge-tts pillow`
 * ffmpeg and ffprobe. Bundled Mac binaries in `worker/tools` are used automatically; Docker installs them too.
+* `ANTHROPIC_API_KEY`, required to infer unstated narrator ages, visually verify every presenter age, match scenes, and create automatic thumbnail copy
 
 ## Quick start
 
@@ -68,9 +69,14 @@ override Ava. A legacy `voice` CSV column is accepted only so old files still
 parse; its value is ignored.
 
 The presenter is likewise locked to a white adult woman and is always composited
-on the left side of the frame. Every accepted presenter seed and image hash is
-saved in `output/.presenter-history.json`; duplicates are rejected and regenerated.
-The exact accepted image is reused in that video's thumbnail.
+on the left side of the frame. Her target age is taken from the narrator's
+explicit first-person age in the script; when it is not stated, Claude infers the
+present-day narrator age from the story timeline. Claude then checks the generated
+portrait's visible age. Mismatches are rejected and regenerated, and an
+unverifiable age fails the video before upload. Every accepted presenter seed,
+image hash, and age is saved in `output/.presenter-history.json`; duplicates are
+rejected and regenerated. The exact accepted image is reused in that video's
+thumbnail.
 
 ## Locked captions and scene matching
 
@@ -106,10 +112,11 @@ requires exactly two lines of 2-6 words each and 5-11 words total. Invalid or
 unavailable automatic copy stops the upload instead of publishing a weak
 one-sentence thumbnail.
 
-## Settings (all optional)
+## Settings
 
 | Variable | Default | Meaning |
 | :-- | :-- | :-- |
+| `ANTHROPIC_API_KEY` | required | Infers unstated narrator age and rejects visibly age-mismatched presenters |
 | `CF_INPUT` | `./input` | Folder to watch for CSV files |
 | `CF_OUTPUT` | `./output` | Folder for finished videos |
 | `CF_STYLE` | `story` | Default split-screen storytime format |

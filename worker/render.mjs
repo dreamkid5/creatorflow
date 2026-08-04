@@ -12,9 +12,12 @@ import { buildThumbnail } from "./thumbnail.mjs";
 import {
   loadPresenterHistory,
   presenterHash,
+  presenterAgeDescription,
   presenterSeed,
   presenterWasUsed,
   recordPresenter,
+  resolvePresenterAge,
+  validatePresenterAge,
   savePresenterHistory
 } from "./presenter.mjs";
 import {
@@ -548,8 +551,15 @@ export async function renderJob(job, cfg, workDir, outFile) {
 
   let presenter = null;
   if (storyMode) {
+    if (!cfg.anthropicKey) {
+      throw new Error("ANTHROPIC_API_KEY is required for the locked presenter-age check");
+    }
+    const ageResult = await resolvePresenterAge(job, cfg);
+    job.presenterAge = ageResult.age;
+    cfg.log("  presenter age target: " + ageResult.age + " (" + ageResult.source + ")");
     const description =
-      "one friendly relatable white adult woman in her early thirties, clearly European appearance, unmistakably female, natural shoulder-length hair, plain soft grey modern top, no man, no male person";
+      "one friendly relatable white adult woman, " + presenterAgeDescription(ageResult.age) +
+      ", clearly European appearance, unmistakably female, age-appropriate facial features and natural skin texture, natural shoulder-length hair, plain soft grey modern top, no man, no male person";
     const prompt = "cinematic photorealistic upper body portrait of " + description +
       ", warm genuine calm expression, facing the camera, soft natural indoor lighting, " +
       "softly blurred cosy home background, shallow depth of field, 35mm, highly detailed " +
@@ -570,6 +580,13 @@ export async function renderJob(job, cfg, workDir, outFile) {
         cfg.log("  presenter duplicate rejected; generating another woman");
         continue;
       }
+      const ageCheck = await validatePresenterAge(presenterPath, ageResult.age, cfg);
+      if (!ageCheck.match) {
+        cfg.log("  presenter age mismatch rejected: target " + ageResult.age +
+          ", visible estimate " + (ageCheck.estimatedAge || "unknown") +
+          "; generating another woman");
+        continue;
+      }
       presenter = presenterPath;
       job.presenterFile = presenterPath;
       job.presenterSeed = seed;
@@ -577,9 +594,9 @@ export async function renderJob(job, cfg, workDir, outFile) {
       await savePresenterHistory(cfg.presenterHistory, history);
     }
     if (!presenter) {
-      throw new Error("white female presenter generation failed; refusing to render without the required left presenter");
+      throw new Error("age-matched white female presenter generation failed; refusing to render with a mismatched presenter");
     }
-    cfg.log("  presenter: ready (white woman, left panel)");
+    cfg.log("  presenter: ready (age " + ageResult.age + " white woman, left panel)");
   }
 
   // Character bible: keep the main characters looking the same across scenes.
