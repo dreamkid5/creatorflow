@@ -190,13 +190,14 @@ export async function validatePresenterAge(file, targetAge, cfg = {}, options = 
   const estimatedAge = normalizeAdultAge(data.estimatedAge);
   const minAge = normalizeAdultAge(data.minAge) || estimatedAge;
   const maxAge = normalizeAdultAge(data.maxAge) || estimatedAge;
-  if (!estimatedAge || data.adultWoman !== true) {
-    return { match: false, estimatedAge, minAge, maxAge };
+  const adultWoman = data.adultWoman === true;
+  if (!estimatedAge || !adultWoman) {
+    return { match: false, adultWoman, estimatedAge, minAge, maxAge };
   }
   const target = normalizeAdultAge(targetAge);
   const closeEstimate = Math.abs(estimatedAge - target) <= 5;
   const overlapsTarget = target >= minAge - 3 && target <= maxAge + 3;
-  return { match: closeEstimate && overlapsTarget, estimatedAge, minAge, maxAge };
+  return { match: closeEstimate && overlapsTarget, adultWoman, estimatedAge, minAge, maxAge };
 }
 
 export function presenterSeed(job = {}, nonce = 0) {

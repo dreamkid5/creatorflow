@@ -565,8 +565,13 @@ export async function renderJob(job, cfg, workDir, outFile) {
       "softly blurred cosy home background, shallow depth of field, 35mm, highly detailed " +
       "realistic skin and face, centered head and shoulders, not an illustration";
     const presenterPath = path.join(workDir, "presenter.jpg");
+    const bestPath = path.join(workDir, "presenter-best.jpg");
     const history = await loadPresenterHistory(cfg.presenterHistory);
     const startNonce = history.nextNonce;
+    // Age matching is a preference, not a hard gate: an image generator cannot be
+    // steered to an exact visible age, so we keep the closest adult-woman portrait
+    // seen and fall back to her rather than failing the whole video.
+    let best = null;
     for (let attempt = 0; attempt < 20 && !presenter; attempt++) {
       const nonce = startNonce + attempt;
       const seed = presenterSeed(job, nonce);
@@ -582,9 +587,18 @@ export async function renderJob(job, cfg, workDir, outFile) {
       }
       const ageCheck = await validatePresenterAge(presenterPath, ageResult.age, cfg);
       if (!ageCheck.match) {
-        cfg.log("  presenter age mismatch rejected: target " + ageResult.age +
+        cfg.log("  presenter age mismatch: target " + ageResult.age +
           ", visible estimate " + (ageCheck.estimatedAge || "unknown") +
           "; generating another woman");
+        // Remember the closest adult woman so far, so a run that never lands an
+        // exact match still ships a sensible presenter instead of no video.
+        if (ageCheck.adultWoman && ageCheck.estimatedAge) {
+          const distance = Math.abs(ageCheck.estimatedAge - ageResult.age);
+          if (!best || distance < best.distance) {
+            await fs.copyFile(presenterPath, bestPath);
+            best = { file: bestPath, seed, hash, nonce, distance, estimatedAge: ageCheck.estimatedAge };
+          }
+        }
         continue;
       }
       presenter = presenterPath;
@@ -594,7 +608,16 @@ export async function renderJob(job, cfg, workDir, outFile) {
       await savePresenterHistory(cfg.presenterHistory, history);
     }
     if (!presenter) {
-      throw new Error("age-matched white female presenter generation failed; refusing to render with a mismatched presenter");
+      if (!best) {
+        throw new Error("could not generate any usable presenter portrait (image service returned no valid adult-woman image)");
+      }
+      cfg.log("  presenter: no exact age match after 20 tries; using closest woman" +
+        " (target " + ageResult.age + ", visible estimate " + best.estimatedAge + ")");
+      presenter = best.file;
+      job.presenterFile = best.file;
+      job.presenterSeed = best.seed;
+      recordPresenter(history, job, best.seed, best.hash, best.nonce);
+      await savePresenterHistory(cfg.presenterHistory, history);
     }
     cfg.log("  presenter: ready (age " + ageResult.age + " white woman, left panel)");
   }
