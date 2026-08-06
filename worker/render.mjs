@@ -810,7 +810,7 @@ export async function renderJob(job, cfg, workDir, outFile) {
     const t = await buildThumbnail(job, cfg, workDir, thumbFile, { run });
     if (!t) throw new Error("the required presenter thumbnail was not created");
     job.thumbnailFile = thumbFile;
-    cfg.log("  thumbnail: " + path.basename(thumbFile) + " (two-beat kicker + same presenter)");
+    cfg.log("  thumbnail: " + path.basename(thumbFile) + " (four-beat wordy kicker + same presenter)");
   }
 
   return outFile;
